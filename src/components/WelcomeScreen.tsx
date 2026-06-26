@@ -21,6 +21,8 @@ interface WelcomeScreenProps {
   setPhoneInput: (phone: string) => void;
   passwordInput: string;
   setPasswordInput: (password: string) => void;
+  birthDateInput: string;
+  setBirthDateInput: (date: string) => void;
   rememberMe: boolean;
   setRememberMe: (val: boolean) => void;
   onLogin: () => void;
@@ -36,6 +38,8 @@ export default function WelcomeScreen({
   setPhoneInput,
   passwordInput,
   setPasswordInput,
+  birthDateInput,
+  setBirthDateInput,
   rememberMe,
   setRememberMe,
   onLogin,
@@ -161,6 +165,13 @@ export default function WelcomeScreen({
             </>
           )}
 
+          {isRegister && (
+            <>
+              <Text style={styles.welcomeInputLabel}>Date of Birth</Text>
+              <TextInput style={styles.welcomeInput} placeholder="YYYY-MM-DD" placeholderTextColor="#6B7280" value={birthDateInput} onChangeText={setBirthDateInput} />
+            </>
+          )}
+
           <Text style={styles.welcomeInputLabel}>Email Address</Text>
           <TextInput 
             style={styles.welcomeInput} 
@@ -188,7 +199,7 @@ export default function WelcomeScreen({
           <Text style={styles.welcomeInputLabel}>Password</Text>
           <TextInput 
             style={styles.welcomeInput} 
-            placeholder={isRegister ? 'Enter password (min 6 characters)' : 'Enter your password'} 
+            placeholder={isRegister ? 'At least 10 letters and numbers' : 'Enter your password'}
             placeholderTextColor="#6B7280"
             secureTextEntry={true}
             value={passwordInput}

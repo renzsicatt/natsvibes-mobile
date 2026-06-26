@@ -63,6 +63,8 @@ function MainApp() {
     setPhoneInput,
     passwordInput,
     setPasswordInput,
+    birthDateInput,
+    setBirthDateInput,
     rememberMe,
     setRememberMe,
     currentUser,
@@ -106,6 +108,8 @@ function MainApp() {
           setPhoneInput={setPhoneInput}
           passwordInput={passwordInput}
           setPasswordInput={setPasswordInput}
+          birthDateInput={birthDateInput}
+          setBirthDateInput={setBirthDateInput}
           rememberMe={rememberMe}
           setRememberMe={setRememberMe}
           onLogin={handleLogin}
