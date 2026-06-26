@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
-import type { Profile, Venue, Hangout, JoinRequest } from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { Profile, Venue, Hangout, JoinRequest, MyHangout } from '../types';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE ?? 'http://127.0.0.1:8000/api').replace(/\/$/, '');
 let authToken: string | null = null;
@@ -65,7 +66,8 @@ function normalizeVenue(venue: Venue): Venue {
     area: venue.area,
     address: venue.address,
     venue_type: venue.venue_type,
-    price_range: venue.price_range
+    price_range: venue.price_range,
+    photos: Array.isArray(venue.photos) ? venue.photos : []
   };
 }
 
@@ -91,8 +93,65 @@ function formatDateTimeForApi(value: string): string {
   return parsedDate.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+const STATIC_VENUES: Venue[] = [
+  {
+    id: 1,
+    name: 'Lowlight Wine Room',
+    area: 'Poblacion',
+    address: '4991 P. Guanzon, Makati, 1210 Metro Manila',
+    venue_type: 'Wine Bar',
+    price_range: '$$',
+    photos: [
+      {
+        id: 1,
+        photo_url: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=600&q=80',
+        is_primary: true
+      }
+    ]
+  },
+  {
+    id: 2,
+    name: 'Rooftop Social',
+    area: 'BGC',
+    address: '30th St, Taguig, Metro Manila',
+    venue_type: 'Rooftop Lounge',
+    price_range: '$$$',
+    photos: [
+      {
+        id: 2,
+        photo_url: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?auto=format&fit=crop&w=600&q=80',
+        is_primary: true
+      }
+    ]
+  },
+  {
+    id: 3,
+    name: 'Karaoke Room 88',
+    area: 'Makati',
+    address: 'Valero Street, Salcedo Village, Makati',
+    venue_type: 'Karaoke Lounge',
+    price_range: '$',
+    photos: [
+      {
+        id: 3,
+        photo_url: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=600&q=80',
+        is_primary: true
+      }
+    ]
+  }
+];
+
 export default function useMobileData() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [customAlert, setCustomAlert] = useState<{ title: string; message: string } | null>(null);
+
+  const showAlert = useCallback((title: string, message: string) => {
+    setCustomAlert({ title, message });
+  }, []);
+
+  const hideAlert = useCallback(() => {
+    setCustomAlert(null);
+  }, []);
   const [activeTab, setActiveTab] = useState<'discover' | 'create' | 'chat' | 'safety' | 'profile'>('discover');
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
@@ -104,44 +163,71 @@ export default function useMobileData() {
   const [showApprovalsPanel, setShowApprovalsPanel] = useState(false);
 
   // Authentication Fields
+  const [nameInput, setNameInput] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   const [currentUserId, setCurrentUserId] = useState<number>(5);
 
   // Current User
   const [currentUser, setCurrentUser] = useState<Profile>(emptyProfile);
 
+  // Load persisted session on mount
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const savedEmail = await AsyncStorage.getItem('@natsvibe:email');
+        const savedToken = await AsyncStorage.getItem('@natsvibe:token');
+        const savedRemember = await AsyncStorage.getItem('@natsvibe:remember');
+
+        if (savedEmail) {
+          setEmailInput(savedEmail);
+        }
+        if (savedRemember === 'true') {
+          setRememberMe(true);
+        }
+
+        if (savedToken) {
+          authToken = savedToken;
+          setIsLoadingData(true);
+          try {
+            const result = await apiRequest<{
+              user: { id: number; name: string; email: string };
+              profile: Profile;
+            }>('/me');
+            
+            setCurrentUserId(result.user.id);
+            setCurrentUser(result.profile);
+            setIsLoggedIn(true);
+          } catch (err) {
+            console.log('[Auth] Persisted session token invalid, clearing:', err);
+            await AsyncStorage.removeItem('@natsvibe:token');
+            authToken = null;
+          } finally {
+            setIsLoadingData(false);
+          }
+        }
+      } catch (e) {
+        console.log('[Auth] Error restoring session:', e);
+      }
+    };
+
+    restoreSession();
+  }, []);
+
   // Venues and Hangouts list
-  const [venues, setVenues] = useState<Venue[]>([]);
+  const [venues, setVenues] = useState<Venue[]>(STATIC_VENUES);
   const [hangouts, setHangouts] = useState<Hangout[]>([]);
 
   // Host Join Requests List (kept local for MVP UI simulation)
-  const [requests, setRequests] = useState<JoinRequest[]>([
-    {
-      id: 1,
-      hangout_id: 1,
-      hangout_title: 'Poblacion chill table',
-      user: {
-        name: 'Elena Ramos',
-        age: 24,
-        city: 'Mandaluyong',
-        bio: 'Love cocktail tasting and electronic music events around Makati!',
-        avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-        is_verified: true,
-        vibe_tags: ['Gin', 'Electronic']
-      },
-      notes: 'Hi Renz! Count me in. I love craft vibes.',
-      status: 'pending'
-    }
-  ]);
+  const [requests, setRequests] = useState<JoinRequest[]>([]);
 
-  // Chat Messages State
-  const [messages, setMessages] = useState([
-    { id: 1, sender: 'Sofia V.', text: 'Hey guys! Table is ready near the stage.', time: '8:45 PM', isMe: false },
-    { id: 2, sender: 'Alex R.', text: 'Awesome. Parking now, see ya in 5 mins!', time: '8:50 PM', isMe: false },
-    { id: 3, sender: 'Renz', text: 'On my way! Ordering the standard highball.', time: '8:52 PM', isMe: true }
-  ]);
+  // Chat Messages State & User's Hangouts
+  const [myHangoutsList, setMyHangoutsList] = useState<MyHangout[]>([]);
+  const [activeChatHangout, setActiveChatHangout] = useState<MyHangout | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
   const [typedMessage, setTypedMessage] = useState('');
 
   // Safety Status
@@ -149,9 +235,11 @@ export default function useMobileData() {
   const [checkInActive, setCheckInActive] = useState(false);
 
   // Fetch initial database info
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
   const fetchVenues = useCallback(async () => {
-    const data = await apiRequest<Venue[]>('/venues');
-    setVenues(data.map(normalizeVenue));
+    // Venues are handled statically on the frontend as requested
+    setVenues(STATIC_VENUES);
   }, []);
 
   const fetchHangouts = useCallback(async () => {
@@ -168,21 +256,50 @@ export default function useMobileData() {
     }
   }, [currentUserId]);
 
+  const fetchMyHangouts = useCallback(async () => {
+    try {
+      const data = await apiRequest<MyHangout[]>('/my-hangouts');
+      setMyHangoutsList(data);
+      if (data.length > 0) {
+        setActiveChatHangout(prev => {
+          if (!prev || !data.some(h => h.id === prev.id)) {
+            return data[0];
+          }
+          return data.find(h => h.id === prev.id) || data[0];
+        });
+      } else {
+        setActiveChatHangout(null);
+      }
+    } catch (err) {
+      console.log('[API] Error fetching my hangouts:', err);
+    }
+  }, []);
+
+  const fetchMessages = useCallback(async (hangoutId: number) => {
+    try {
+      const data = await apiRequest<any[]>(`/hangouts/${hangoutId}/messages`);
+      setMessages(data);
+    } catch (err) {
+      console.log('[API] Error fetching messages:', err);
+    }
+  }, []);
+
   const refreshData = useCallback(async () => {
     setIsLoadingData(true);
     setBackendError(null);
 
     try {
-      await Promise.all([fetchVenues(), fetchHangouts(), fetchJoinRequests()]);
+      await Promise.all([fetchVenues(), fetchHangouts(), fetchJoinRequests(), fetchMyHangouts()]);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not connect to backend.';
       setBackendError(message);
-      console.error('Error loading mobile backend data:', err);
-      Alert.alert('Backend unavailable', `Could not load NatsVibe data from ${API_BASE}.`);
+      console.log('[API] Error loading mobile backend data:', err);
+      showAlert('Backend unavailable', `Could not load NatsVibe data from ${API_BASE}.`);
     } finally {
       setIsLoadingData(false);
+      setIsInitialLoad(false);
     }
-  }, [fetchHangouts, fetchJoinRequests, fetchVenues]);
+  }, [fetchHangouts, fetchJoinRequests, fetchVenues, fetchMyHangouts]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -190,9 +307,31 @@ export default function useMobileData() {
     }
   }, [isLoggedIn, refreshData]);
 
+  // Refresh active hangouts when entering chat tab
+  useEffect(() => {
+    if (activeTab === 'chat' && isLoggedIn) {
+      fetchMyHangouts();
+    }
+  }, [activeTab, isLoggedIn, fetchMyHangouts]);
+
+  // Poll messages when in chat tab and there is an active hangout selected
+  useEffect(() => {
+    if (activeTab !== 'chat' || !activeChatHangout || !isLoggedIn) {
+      return;
+    }
+
+    fetchMessages(activeChatHangout.id);
+
+    const interval = setInterval(() => {
+      fetchMessages(activeChatHangout.id);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activeTab, activeChatHangout?.id, isLoggedIn, fetchMessages]);
+
   const handleLogin = async () => {
-    if (!emailInput.trim()) {
-      Alert.alert('Error', 'Please enter your email.');
+    if (!emailInput.trim() || !passwordInput) {
+      showAlert('Error', 'Please enter both email and password.');
       return;
     }
 
@@ -205,8 +344,8 @@ export default function useMobileData() {
       }>('/login', {
         method: 'POST',
         body: JSON.stringify({
-          email: emailInput,
-          phone: phoneInput
+          email: emailInput.trim().toLowerCase(),
+          password: passwordInput
         })
       });
 
@@ -214,26 +353,91 @@ export default function useMobileData() {
       setCurrentUserId(result.user.id);
       setCurrentUser(result.profile);
       setIsLoggedIn(true);
+
+      if (rememberMe) {
+        await AsyncStorage.setItem('@natsvibe:email', emailInput.trim().toLowerCase());
+        await AsyncStorage.setItem('@natsvibe:token', result.token);
+        await AsyncStorage.setItem('@natsvibe:remember', 'true');
+      } else {
+        await AsyncStorage.removeItem('@natsvibe:token');
+        await AsyncStorage.removeItem('@natsvibe:email');
+        await AsyncStorage.setItem('@natsvibe:remember', 'false');
+      }
     } catch (err) {
-      console.error('Login error:', err);
-      Alert.alert('Login Failed', err instanceof Error ? err.message : 'Could not authenticate.');
+      console.log('[Auth] Login error:', err);
+      showAlert('Login Failed', err instanceof Error ? err.message : 'Could not authenticate.');
     } finally {
       setIsLoadingData(false);
     }
   };
 
-  const handleLogout = () => {
+  const handleRegister = async () => {
+    if (!nameInput.trim() || !emailInput.trim() || !passwordInput) {
+      showAlert('Error', 'Please fill in Name, Email, and Password.');
+      return;
+    }
+
+    setIsLoadingData(true);
+    try {
+      const result = await apiRequest<{
+        token: string;
+        user: { id: number; name: string; email: string };
+        profile: Profile;
+      }>('/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: nameInput.trim(),
+          email: emailInput.trim().toLowerCase(),
+          phone: phoneInput.trim() || null,
+          password: passwordInput
+        })
+      });
+
+      authToken = result.token;
+      setCurrentUserId(result.user.id);
+      setCurrentUser(result.profile);
+      setIsLoggedIn(true);
+
+      if (rememberMe) {
+        await AsyncStorage.setItem('@natsvibe:email', emailInput.trim().toLowerCase());
+        await AsyncStorage.setItem('@natsvibe:token', result.token);
+        await AsyncStorage.setItem('@natsvibe:remember', 'true');
+      } else {
+        await AsyncStorage.removeItem('@natsvibe:token');
+        await AsyncStorage.removeItem('@natsvibe:email');
+        await AsyncStorage.setItem('@natsvibe:remember', 'false');
+      }
+      showAlert('Success', 'Registered successfully!');
+    } catch (err) {
+      console.log('[Auth] Registration error:', err);
+      showAlert('Registration Failed', err instanceof Error ? err.message : 'Could not register.');
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('@natsvibe:token');
+    } catch (e) {
+      console.log('[Auth] Error removing token on logout:', e);
+    }
     authToken = null;
     setCurrentUserId(5);
     setCurrentUser(emptyProfile);
     setIsLoggedIn(false);
-    setEmailInput('');
+    if (!rememberMe) {
+      setEmailInput('');
+    }
+    setPasswordInput('');
+    setNameInput('');
     setPhoneInput('');
+    setRequests([]);
   };
 
   const handleCreateGroup = async (title: string, dateTime: string, venueIndex: number, description: string) => {
     if (!title || !dateTime || !venues[venueIndex]) {
-      Alert.alert('Error', 'Please fill in all required fields.');
+      showAlert('Error', 'Please fill in all required fields.');
       return;
     }
 
@@ -255,12 +459,12 @@ export default function useMobileData() {
         method: 'POST',
         body: JSON.stringify(postData)
       });
-      Alert.alert('Success', 'Hangout published successfully!');
+      showAlert('Success', 'Hangout published successfully!');
       await fetchHangouts();
       setActiveTab('discover');
     } catch (err) {
-      console.error('Error creating hangout on mobile:', err);
-      Alert.alert('Error', 'Could not save hangout to backend.');
+      console.log('[API] Error creating hangout on mobile:', err);
+      showAlert('Error', 'Could not save hangout to backend.');
     }
   };
 
@@ -276,7 +480,7 @@ export default function useMobileData() {
     };
 
     try {
-      const savedRequest = await apiRequest<JoinRequest>('/join-requests', {
+      await apiRequest<JoinRequest>('/join-requests', {
         method: 'POST',
         body: JSON.stringify({
           hangout_id: selectedHangout.id,
@@ -284,12 +488,10 @@ export default function useMobileData() {
           notes: joinNotes
         })
       });
-      setRequests(prev => [...prev, savedRequest]);
-      Alert.alert('Request Sent', 'Host will review your profile shortly!');
+      showAlert('Request Sent', 'Host will review your profile shortly!');
     } catch (err) {
-      console.warn('Could not save join request to backend; keeping local pending request:', err);
-      setRequests(prev => [...prev, newRequest]);
-      Alert.alert('Request Saved Locally', 'Backend join-request endpoint is not available yet.');
+      console.log('[API] Could not save join request to backend:', err);
+      showAlert('Error', err instanceof Error ? err.message : 'Could not send join request.');
     } finally {
       setShowRequestModal(false);
       setSelectedHangout(null);
@@ -304,7 +506,7 @@ export default function useMobileData() {
         body: JSON.stringify({ status })
       });
     } catch (err) {
-      console.warn('Could not update join request on backend; applying local state only:', err);
+      console.log('[API] Could not update join request on backend:', err);
     }
 
     setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
@@ -318,17 +520,23 @@ export default function useMobileData() {
     }
   };
 
-  const handleSendChat = () => {
-    if (!typedMessage.trim()) return;
-    const msg = {
-      id: messages.length + 1,
-      sender: currentUser.name,
-      text: typedMessage,
-      time: 'Just Now',
-      isMe: true
-    };
-    setMessages(prev => [...prev, msg]);
+  const handleSendChat = async () => {
+    if (!typedMessage.trim() || !activeChatHangout) return;
+    const textToSend = typedMessage.trim();
     setTypedMessage('');
+
+    try {
+      const result = await apiRequest<any>(`/hangouts/${activeChatHangout.id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({
+          message_text: textToSend
+        })
+      });
+      setMessages(prev => [...prev, result]);
+    } catch (err) {
+      console.log('[API] Error sending message:', err);
+      showAlert('Error', 'Could not send message.');
+    }
   };
 
   return {
@@ -344,10 +552,16 @@ export default function useMobileData() {
     setJoinNotes,
     showApprovalsPanel,
     setShowApprovalsPanel,
+    nameInput,
+    setNameInput,
     emailInput,
     setEmailInput,
     phoneInput,
     setPhoneInput,
+    passwordInput,
+    setPasswordInput,
+    rememberMe,
+    setRememberMe,
     currentUser,
     venues,
     hangouts,
@@ -362,11 +576,19 @@ export default function useMobileData() {
     checkInActive,
     setCheckInActive,
     handleLogin,
+    handleRegister,
     handleLogout,
+    customAlert,
+    showAlert,
+    hideAlert,
     refreshData,
     handleCreateGroup,
     handleSendRequest,
     handleApprovalAction,
-    handleSendChat
+    handleSendChat,
+    myHangoutsList,
+    activeChatHangout,
+    setActiveChatHangout,
+    fetchMyHangouts
   };
 }

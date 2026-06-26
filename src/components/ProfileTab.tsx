@@ -13,11 +13,13 @@ import type { Profile } from '../types';
 interface ProfileTabProps {
   currentUser: Profile;
   onShowApprovals: () => void;
+  pendingApprovalsCount: number;
 }
 
 export default function ProfileTab({
   currentUser,
-  onShowApprovals
+  onShowApprovals,
+  pendingApprovalsCount
 }: ProfileTabProps) {
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
@@ -42,9 +44,11 @@ export default function ProfileTab({
             Review Host Approvals
           </Text>
         </View>
-        <View style={styles.redDot}>
-          <Text style={{ color: 'white', fontSize: 10, fontWeight: '700' }}>1</Text>
-        </View>
+        {pendingApprovalsCount > 0 && (
+          <View style={styles.redDot}>
+            <Text style={{ color: 'white', fontSize: 10, fontWeight: '700' }}>{pendingApprovalsCount}</Text>
+          </View>
+        )}
       </TouchableOpacity>
 
       <View style={styles.profileBody}>

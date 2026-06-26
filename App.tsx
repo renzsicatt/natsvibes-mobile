@@ -31,6 +31,7 @@ import ProfileTab from './src/components/ProfileTab';
 import HangoutDetailsModal from './src/components/HangoutDetailsModal';
 import JoinRequestModal from './src/components/JoinRequestModal';
 import ApprovalsModal from './src/components/ApprovalsModal';
+import CustomAlertModal from './src/components/CustomAlertModal';
 
 export default function App() {
   return (
@@ -54,10 +55,16 @@ function MainApp() {
     setJoinNotes,
     showApprovalsPanel,
     setShowApprovalsPanel,
+    nameInput,
+    setNameInput,
     emailInput,
     setEmailInput,
     phoneInput,
     setPhoneInput,
+    passwordInput,
+    setPasswordInput,
+    rememberMe,
+    setRememberMe,
     currentUser,
     venues,
     hangouts,
@@ -70,11 +77,18 @@ function MainApp() {
     checkInActive,
     setCheckInActive,
     handleLogin,
+    handleRegister,
     handleLogout,
+    customAlert,
+    showAlert,
+    hideAlert,
     handleCreateGroup,
     handleSendRequest,
     handleApprovalAction,
-    handleSendChat
+    handleSendChat,
+    myHangoutsList,
+    activeChatHangout,
+    setActiveChatHangout
   } = useMobileData();
 
   return (
@@ -84,11 +98,18 @@ function MainApp() {
       {/* 1. WELCOME SCREEN / AUTH GATE */}
       {!isLoggedIn ? (
         <WelcomeScreen 
+          nameInput={nameInput}
+          setNameInput={setNameInput}
           emailInput={emailInput}
           setEmailInput={setEmailInput}
           phoneInput={phoneInput}
           setPhoneInput={setPhoneInput}
+          passwordInput={passwordInput}
+          setPasswordInput={setPasswordInput}
+          rememberMe={rememberMe}
+          setRememberMe={setRememberMe}
           onLogin={handleLogin}
+          onRegister={handleRegister}
         />
       ) : (
         /* 2. MAIN LOGGED-IN PORTAL */
@@ -141,6 +162,10 @@ function MainApp() {
                 typedMessage={typedMessage}
                 setTypedMessage={setTypedMessage}
                 onSendChat={handleSendChat}
+                activeChatHangout={activeChatHangout}
+                myHangoutsList={myHangoutsList}
+                onSelectHangout={setActiveChatHangout}
+                onNavigateToDiscover={() => setActiveTab('discover')}
               />
             )}
 
@@ -159,6 +184,7 @@ function MainApp() {
               <ProfileTab 
                 currentUser={currentUser}
                 onShowApprovals={() => setShowApprovalsPanel(true)}
+                pendingApprovalsCount={requests.filter(r => r.status === 'pending').length}
               />
             )}
 
@@ -198,6 +224,8 @@ function MainApp() {
               hangout={selectedHangout}
               onClose={() => setSelectedHangout(null)}
               onRequestJoin={() => setShowRequestModal(true)}
+              currentUserName={currentUser.name}
+              showAlert={showAlert}
             />
           )}
 
@@ -216,6 +244,14 @@ function MainApp() {
             requests={requests}
             onClose={() => setShowApprovalsPanel(false)}
             onAction={handleApprovalAction}
+          />
+
+          {/* D. CUSTOM GLASSMORPHISM ALERT MODAL */}
+          <CustomAlertModal 
+            visible={customAlert !== null}
+            title={customAlert?.title ?? ''}
+            message={customAlert?.message ?? ''}
+            onClose={hideAlert}
           />
 
         </View>

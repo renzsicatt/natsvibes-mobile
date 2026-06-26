@@ -16,13 +16,18 @@ interface HangoutDetailsModalProps {
   hangout: Hangout;
   onClose: () => void;
   onRequestJoin: () => void;
+  currentUserName?: string;
+  showAlert?: (title: string, message: string) => void;
 }
 
 export default function HangoutDetailsModal({
   hangout,
   onClose,
-  onRequestJoin
+  onRequestJoin,
+  currentUserName,
+  showAlert
 }: HangoutDetailsModalProps) {
+  const isHost = currentUserName && hangout.host.name === currentUserName;
   return (
     <Modal
       animationType="slide"
@@ -48,7 +53,7 @@ export default function HangoutDetailsModal({
               <Text style={styles.modalLabel}>Meeting Venue</Text>
               <Text style={styles.modalTextBig}>{hangout.venue.name}</Text>
               <Text style={styles.modalTextSub}>{hangout.venue.address} ({hangout.venue.venue_type})</Text>
-              <TouchableOpacity onPress={() => Alert.alert('External Link', 'Redirecting to Google Maps...')} style={styles.mapsLinkBtn}>
+              <TouchableOpacity onPress={() => showAlert ? showAlert('External Link', 'Redirecting to Google Maps...') : Alert.alert('External Link', 'Redirecting to Google Maps...')} style={styles.mapsLinkBtn}>
                 <MapPin size={12} color="#8B5CF6" />
                 <Text style={styles.mapsLinkBtnText}>Open in Google Maps</Text>
               </TouchableOpacity>
@@ -98,12 +103,18 @@ export default function HangoutDetailsModal({
             </View>
 
             {/* Action button */}
-            <TouchableOpacity 
-              style={styles.modalActionBtn}
-              onPress={onRequestJoin}
-            >
-              <Text style={styles.modalActionBtnText}>Request to Join Group</Text>
-            </TouchableOpacity>
+            {isHost ? (
+              <View style={[styles.modalActionBtn, styles.disabledBtn]}>
+                <Text style={styles.modalActionBtnText}>You are hosting this hangout</Text>
+              </View>
+            ) : (
+              <TouchableOpacity 
+                style={styles.modalActionBtn}
+                onPress={onRequestJoin}
+              >
+                <Text style={styles.modalActionBtnText}>Request to Join Group</Text>
+              </TouchableOpacity>
+            )}
 
             <View style={{ height: 40 }} />
           </ScrollView>
@@ -226,6 +237,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 20,
+  },
+  disabledBtn: {
+    backgroundColor: '#374151',
+    opacity: 0.7,
   },
   modalActionBtnText: {
     color: 'white',

@@ -5,8 +5,10 @@ import {
   View, 
   ScrollView, 
   TouchableOpacity, 
-  TextInput 
+  TextInput,
+  Image 
 } from 'react-native';
+import { MapPin, Check, Search } from 'lucide-react-native';
 import type { Venue } from '../types';
 
 interface CreateTabProps {
@@ -20,15 +22,24 @@ export default function CreateTab({
 }: CreateTabProps) {
   const [newTitle, setNewTitle] = useState('');
   const [newDateTime, setNewDateTime] = useState('');
-  const [selectedVenueIndex, setSelectedVenueIndex] = useState(0);
+  const [selectedVenueId, setSelectedVenueId] = useState<number>(venues[0]?.id || 1);
   const [newDesc, setNewDesc] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredVenues = venues.filter(venue => 
+    venue.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    venue.venue_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    venue.area.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    venue.address.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleSubmit = () => {
-    onCreateGroup(newTitle, newDateTime, selectedVenueIndex, newDesc);
-    // resetting is handled inside parent if succeeded, or we can clear here
+    const originalIndex = venues.findIndex(v => v.id === selectedVenueId);
+    onCreateGroup(newTitle, newDateTime, originalIndex >= 0 ? originalIndex : 0, newDesc);
     setNewTitle('');
     setNewDateTime('');
     setNewDesc('');
+    setSearchQuery('');
   };
 
   return (
@@ -56,19 +67,67 @@ export default function CreateTab({
         />
 
         <Text style={styles.label}>Choose Venue</Text>
-        {venues.length > 0 ? (
+        
+        {/* Search Input Bar */}
+        <View style={styles.searchBarContainer}>
+          <Search size={16} color="#6B7280" style={styles.searchIcon} />
+          <TextInput 
+            style={styles.searchInput} 
+            placeholder="Search by name, area, or type..." 
+            placeholderTextColor="#6B7280"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+
+        {filteredVenues.length > 0 ? (
           <View style={styles.venuePicker}>
-            {venues.map((venue, idx) => (
-              <TouchableOpacity 
-                key={venue.id} 
-                style={[styles.venueOption, selectedVenueIndex === idx && styles.venueOptionSelected]}
-                onPress={() => setSelectedVenueIndex(idx)}
-              >
-                <Text style={[styles.venueOptionText, selectedVenueIndex === idx && styles.venueOptionTextSelected]}>
-                  {venue.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {filteredVenues.map((venue) => {
+              const isSelected = selectedVenueId === venue.id;
+              const imageUrl = venue.photos && venue.photos.length > 0 
+                ? venue.photos[0].photo_url 
+                : 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80';
+              
+              return (
+                <TouchableOpacity 
+                  key={venue.id} 
+                  style={[styles.venueCard, isSelected && styles.venueCardSelected]}
+                  onPress={() => setSelectedVenueId(venue.id)}
+                >
+                  <Image source={{ uri: imageUrl }} style={styles.venueImage} />
+                  
+                  <View style={styles.venueDetails}>
+                    <View style={styles.venueHeaderRow}>
+                      <Text style={[styles.venueName, isSelected && styles.venueNameSelected]} numberOfLines={1}>
+                        {venue.name}
+                      </Text>
+                      {isSelected && (
+                        <View style={styles.checkBadge}>
+                          <Check size={10} color="#FFFFFF" strokeWidth={3} />
+                        </View>
+                      )}
+                    </View>
+                    
+                    <View style={styles.venueMetaRow}>
+                      <Text style={styles.venueType}>{venue.venue_type}</Text>
+                      <Text style={styles.venueDot}>•</Text>
+                      <Text style={styles.venuePrice}>{venue.price_range}</Text>
+                    </View>
+
+                    <View style={styles.venueLocationRow}>
+                      <MapPin size={12} color="#9CA3AF" />
+                      <Text style={styles.venueAddress} numberOfLines={1}>
+                        {venue.address}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : venues.length > 0 ? (
+          <View style={styles.noResultsContainer}>
+            <Text style={styles.noResultsText}>No venues match "{searchQuery}"</Text>
           </View>
         ) : (
           <Text style={{ color: '#9CA3AF', fontSize: 13, fontStyle: 'italic' }}>Loading venues from admin...</Text>
@@ -135,33 +194,118 @@ const styles = StyleSheet.create({
     height: 100,
     textAlignVertical: 'top',
   },
-  venuePicker: {
+  searchBarContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  venueOption: {
-    flex: 1,
-    minWidth: '45%',
+    alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderWidth: 1,
     borderColor: 'rgba(139, 92, 246, 0.15)',
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
     marginBottom: 4,
   },
-  venueOptionSelected: {
-    borderColor: '#8B5CF6',
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+  searchIcon: {
+    marginRight: 8,
   },
-  venueOptionText: {
-    color: '#9CA3AF',
-    fontSize: 12,
+  searchInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 14,
+  },
+  venuePicker: {
+    gap: 12,
+    flexDirection: 'column',
+  },
+  venueCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.15)',
+    borderRadius: 14,
+    overflow: 'hidden',
+    padding: 10,
+    gap: 12,
+  },
+  venueCardSelected: {
+    borderColor: '#8B5CF6',
+    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+  },
+  venueImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 10,
+    backgroundColor: '#120E22',
+  },
+  venueDetails: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  venueHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  venueName: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+    paddingRight: 8,
+  },
+  venueNameSelected: {
+    color: '#8B5CF6',
+  },
+  checkBadge: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#8B5CF6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  venueMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  venueType: {
+    color: '#A78BFA',
+    fontSize: 11,
     fontWeight: '600',
   },
-  venueOptionTextSelected: {
-    color: '#8B5CF6',
+  venueDot: {
+    color: '#6B7280',
+    fontSize: 11,
+  },
+  venuePrice: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  venueLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  venueAddress: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    flex: 1,
+  },
+  noResultsContainer: {
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.01)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+  },
+  noResultsText: {
+    color: '#6B7280',
+    fontSize: 13,
   },
   submitBtn: {
     backgroundColor: '#8B5CF6',

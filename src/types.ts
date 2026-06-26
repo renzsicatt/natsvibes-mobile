@@ -8,6 +8,12 @@ export interface Profile {
   vibe_tags: string[];
 }
 
+export interface VenuePhoto {
+  id: number;
+  photo_url: string;
+  is_primary: boolean;
+}
+
 export interface Venue {
   id: number;
   name: string;
@@ -15,6 +21,7 @@ export interface Venue {
   address: string;
   venue_type: string;
   price_range: string;
+  photos?: VenuePhoto[];
 }
 
 export interface Hangout {
@@ -39,4 +46,12 @@ export interface JoinRequest {
   user: Profile;
   notes: string;
   status: 'pending' | 'approved' | 'declined';
+}
+
+export interface MyHangout {
+  id: number;
+  title: string;
+  venue_name: string;
+  members_names: string[];
+  time_summary: string;
 }

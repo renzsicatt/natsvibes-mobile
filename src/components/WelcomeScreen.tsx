@@ -13,22 +13,37 @@ import {
 const { width, height } = Dimensions.get('window');
 
 interface WelcomeScreenProps {
+  nameInput: string;
+  setNameInput: (name: string) => void;
   emailInput: string;
   setEmailInput: (email: string) => void;
   phoneInput: string;
   setPhoneInput: (phone: string) => void;
+  passwordInput: string;
+  setPasswordInput: (password: string) => void;
+  rememberMe: boolean;
+  setRememberMe: (val: boolean) => void;
   onLogin: () => void;
+  onRegister: () => void;
 }
 
 export default function WelcomeScreen({
+  nameInput,
+  setNameInput,
   emailInput,
   setEmailInput,
   phoneInput,
   setPhoneInput,
-  onLogin
+  passwordInput,
+  setPasswordInput,
+  rememberMe,
+  setRememberMe,
+  onLogin,
+  onRegister
 }: WelcomeScreenProps) {
   const [slideIndex, setSlideIndex] = useState(0);
   const [showLoginForm, setShowLoginForm] = useState(false);
+  const [isRegister, setIsRegister] = useState(false);
 
   const slides = [
     {
@@ -131,7 +146,22 @@ export default function WelcomeScreen({
         </View>
 
         <View style={styles.welcomeForm}>
-          <Text style={styles.welcomeInputLabel}>Sign up with Email</Text>
+          <Text style={styles.formHeaderTitle}>{isRegister ? 'Create Account' : 'Welcome Back'}</Text>
+          
+          {isRegister && (
+            <>
+              <Text style={styles.welcomeInputLabel}>Full Name</Text>
+              <TextInput 
+                style={styles.welcomeInput} 
+                placeholder="e.g. Renz Sicat" 
+                placeholderTextColor="#6B7280"
+                value={nameInput}
+                onChangeText={setNameInput}
+              />
+            </>
+          )}
+
+          <Text style={styles.welcomeInputLabel}>Email Address</Text>
           <TextInput 
             style={styles.welcomeInput} 
             placeholder="e.g. renz@email.com" 
@@ -141,18 +171,56 @@ export default function WelcomeScreen({
             onChangeText={setEmailInput}
           />
 
-          <Text style={styles.welcomeInputLabel}>Mobile Phone (for safety checks)</Text>
+          {isRegister && (
+            <>
+              <Text style={styles.welcomeInputLabel}>Mobile Phone (for safety checks)</Text>
+              <TextInput 
+                style={styles.welcomeInput} 
+                placeholder="e.g. +63 917 123 4567" 
+                placeholderTextColor="#6B7280"
+                keyboardType="phone-pad"
+                value={phoneInput}
+                onChangeText={setPhoneInput}
+              />
+            </>
+          )}
+
+          <Text style={styles.welcomeInputLabel}>Password</Text>
           <TextInput 
             style={styles.welcomeInput} 
-            placeholder="e.g. +63 917 123 4567" 
+            placeholder={isRegister ? 'Enter password (min 6 characters)' : 'Enter your password'} 
             placeholderTextColor="#6B7280"
-            keyboardType="phone-pad"
-            value={phoneInput}
-            onChangeText={setPhoneInput}
+            secureTextEntry={true}
+            value={passwordInput}
+            onChangeText={setPasswordInput}
           />
 
-          <TouchableOpacity style={styles.welcomeBtn} onPress={onLogin}>
-            <Text style={styles.welcomeBtnText}>Get Started</Text>
+          {!isRegister && (
+            <TouchableOpacity 
+              style={styles.rememberMeRow} 
+              onPress={() => setRememberMe(!rememberMe)}
+            >
+              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                {rememberMe && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text style={styles.rememberMeText}>Remember Me</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity 
+            style={styles.welcomeBtn} 
+            onPress={isRegister ? onRegister : onLogin}
+          >
+            <Text style={styles.welcomeBtnText}>{isRegister ? 'Sign Up' : 'Log In'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            onPress={() => setIsRegister(!isRegister)} 
+            style={{ marginTop: 12 }}
+          >
+            <Text style={styles.toggleLinkText}>
+              {isRegister ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => { setShowLoginForm(false); setSlideIndex(0); }} style={{ marginTop: 14 }}>
@@ -333,10 +401,53 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   backLinkText: {
-    color: '#8B5CF6',
-    fontSize: 13,
-    fontWeight: '600',
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '500',
     textAlign: 'center',
+  },
+  toggleLinkText: {
+    color: '#8B5CF6',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  formHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  rememberMeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 4,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(139, 92, 246, 0.5)',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  checkboxChecked: {
+    backgroundColor: '#8B5CF6',
+    borderColor: '#8B5CF6',
+  },
+  checkmark: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  rememberMeText: {
+    color: '#9CA3AF',
+    fontSize: 13,
+    fontWeight: '500',
   },
   termsText: {
     fontSize: 11,

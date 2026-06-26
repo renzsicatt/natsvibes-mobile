@@ -78,9 +78,11 @@ export default function ApprovalsModal({
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <Text style={{ color: req.status === 'approved' ? '#10B981' : '#EF4444', fontWeight: '600', textTransform: 'capitalize', fontSize: 13 }}>
-                    Request Status: {req.status}
-                  </Text>
+                  <View style={[styles.statusBadge, req.status === 'approved' ? styles.statusApproved : styles.statusDeclined]}>
+                    <Text style={[styles.statusBadgeText, req.status === 'approved' ? styles.statusTextApproved : styles.statusTextDeclined]}>
+                      {req.status === 'approved' ? 'Approved ✓' : 'Declined ✕'}
+                    </Text>
+                  </View>
                 )}
               </View>
             ))}
@@ -162,5 +164,31 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
     alignItems: 'center',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  statusApproved: {
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  statusDeclined: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusTextApproved: {
+    color: '#10B981',
+  },
+  statusTextDeclined: {
+    color: '#EF4444',
   },
 });
