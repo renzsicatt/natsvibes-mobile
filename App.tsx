@@ -15,6 +15,7 @@ import {
   User, 
   MapPin, 
   LogOut
+  ,Bell
 } from 'lucide-react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
@@ -32,6 +33,7 @@ import HangoutDetailsModal from './src/components/HangoutDetailsModal';
 import JoinRequestModal from './src/components/JoinRequestModal';
 import ApprovalsModal from './src/components/ApprovalsModal';
 import CustomAlertModal from './src/components/CustomAlertModal';
+import NotificationsModal from './src/components/NotificationsModal';
 
 export default function App() {
   return (
@@ -68,8 +70,11 @@ function MainApp() {
     rememberMe,
     setRememberMe,
     currentUser,
+    currentUserRole,
     venues,
     hangouts,
+    vibeTags,
+    myJoinRequests,
     requests,
     messages,
     typedMessage,
@@ -91,7 +96,21 @@ function MainApp() {
     myHangoutsList,
     activeChatHangout,
     setActiveChatHangout
+    ,isLoadingData,
+    backendError,
+    pendingAction,
+    refreshAccount,
+    updateProfile
+    ,notifications,
+    showNotifications,
+    setShowNotifications,
+    uploadProfilePhoto,
+    requestHostVerification,
+    markNotificationRead,
+    markAllNotificationsRead
+    ,openNotifications
   } = useMobileData();
+  const unreadNotificationCount = notifications.filter(item => !item.read_at).length;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -114,6 +133,7 @@ function MainApp() {
           setRememberMe={setRememberMe}
           onLogin={handleLogin}
           onRegister={handleRegister}
+          isSubmitting={pendingAction === 'login' || pendingAction === 'register'}
         />
       ) : (
         /* 2. MAIN LOGGED-IN PORTAL */
@@ -130,6 +150,14 @@ function MainApp() {
             </View>
             
             <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              <TouchableOpacity style={styles.notificationButton} onPress={openNotifications}>
+                <Bell size={19} color="#D1D5DB" />
+                {unreadNotificationCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
               <TouchableOpacity style={styles.areaBadge}>
                 <MapPin size={12} color="#8B5CF6" />
                 <Text style={styles.areaText}>Poblacion</Text>
@@ -139,6 +167,12 @@ function MainApp() {
               </TouchableOpacity>
             </View>
           </View>
+
+          {(isLoadingData || backendError) && (
+            <View style={[styles.statusBanner, backendError ? styles.errorBanner : styles.loadingBanner]}>
+              <Text style={styles.statusBannerText}>{backendError ?? 'Loading your NatsVibe data…'}</Text>
+            </View>
+          )}
 
           {/* Tab Pages Switcher */}
           <View style={styles.mainContent}>
@@ -187,8 +221,16 @@ function MainApp() {
             {activeTab === 'profile' && (
               <ProfileTab 
                 currentUser={currentUser}
+                currentUserRole={currentUserRole}
+                vibeTags={vibeTags}
                 onShowApprovals={() => setShowApprovalsPanel(true)}
                 pendingApprovalsCount={requests.filter(r => r.status === 'pending').length}
+                onRefreshStatus={refreshAccount}
+                onSave={updateProfile}
+                onUploadPhoto={uploadProfilePhoto}
+                onRequestHost={requestHostVerification}
+                isSaving={pendingAction === 'profile' || pendingAction === 'photo'}
+                isRefreshing={pendingAction === 'refresh-account' || pendingAction === 'host-verification'}
               />
             )}
 
@@ -230,6 +272,8 @@ function MainApp() {
               onRequestJoin={() => setShowRequestModal(true)}
               currentUserName={currentUser.name}
               showAlert={showAlert}
+              joinRequestStatus={myJoinRequests.find(request => request.hangout_id === selectedHangout.id)?.status}
+              canJoin={currentUser.account_status === 'active' && currentUser.completion_status === 'completed'}
             />
           )}
 
@@ -240,6 +284,7 @@ function MainApp() {
             setNotes={setJoinNotes}
             onSubmit={handleSendRequest}
             onCancel={() => { setShowRequestModal(false); setJoinNotes(''); }}
+            isSubmitting={pendingAction === 'join-request'}
           />
 
           {/* C. HOST APPROVALS OVERLAY MODAL */}
@@ -250,16 +295,24 @@ function MainApp() {
             onAction={handleApprovalAction}
           />
 
-          {/* D. CUSTOM GLASSMORPHISM ALERT MODAL */}
-          <CustomAlertModal 
-            visible={customAlert !== null}
-            title={customAlert?.title ?? ''}
-            message={customAlert?.message ?? ''}
-            onClose={hideAlert}
+          <NotificationsModal
+            visible={showNotifications}
+            notifications={notifications}
+            onClose={() => setShowNotifications(false)}
+            onRead={markNotificationRead}
+            onReadAll={markAllNotificationsRead}
           />
 
         </View>
       )}
+
+      {/* Keep alerts outside the auth gate so login and registration errors are visible. */}
+      <CustomAlertModal
+        visible={customAlert !== null}
+        title={customAlert?.title ?? ''}
+        message={customAlert?.message ?? ''}
+        onClose={hideAlert}
+      />
     </SafeAreaView>
   );
 }
@@ -301,6 +354,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(139, 92, 246, 0.2)',
   },
+  notificationButton: { position: 'relative', padding: 4 },
+  notificationBadge: { position: 'absolute', right: -7, top: -7, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  notificationBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
   areaText: {
     color: '#8B5CF6',
     fontSize: 12,
@@ -308,6 +364,21 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     flex: 1,
+  },
+  statusBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  loadingBanner: {
+    backgroundColor: 'rgba(139, 92, 246, 0.18)',
+  },
+  errorBanner: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  statusBannerText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    textAlign: 'center',
   },
   tabBar: {
     height: 60,

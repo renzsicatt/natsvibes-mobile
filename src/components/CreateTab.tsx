@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { MapPin, Check, Search } from 'lucide-react-native';
 import type { Venue } from '../types';
+import DateTimePickerField from './DateTimePickerField';
 
 interface CreateTabProps {
   venues: Venue[];
@@ -58,12 +59,14 @@ export default function CreateTab({
         />
 
         <Text style={styles.label}>Date & Time</Text>
-        <TextInput 
-          style={styles.input} 
-          placeholder="e.g. Saturday, 9:00 PM" 
-          placeholderTextColor="#6B7280"
+        <DateTimePickerField
           value={newDateTime}
-          onChangeText={setNewDateTime}
+          onChange={setNewDateTime}
+          mode="datetime"
+          placeholder="Select date and time"
+          minimumDate={new Date(Date.now() + 2 * 60 * 60 * 1000)}
+          maximumDate={new Date(Date.now() + 60 * 24 * 60 * 60 * 1000)}
+          defaultDate={new Date(Date.now() + 24 * 60 * 60 * 1000)}
         />
 
         <Text style={styles.label}>Choose Venue</Text>

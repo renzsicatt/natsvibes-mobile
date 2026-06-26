@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { 
+  ActivityIndicator,
   StyleSheet, 
   Text, 
   View, 
   ScrollView, 
-  TouchableOpacity, 
+  TouchableOpacity,
   TextInput,
   Image,
-  Dimensions
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
+import DateTimePickerField from './DateTimePickerField';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,7 +30,8 @@ interface WelcomeScreenProps {
   rememberMe: boolean;
   setRememberMe: (val: boolean) => void;
   onLogin: () => void;
-  onRegister: () => void;
+  onRegister: (confirmPassword: string) => void;
+  isSubmitting: boolean;
 }
 
 export default function WelcomeScreen({
@@ -43,22 +48,25 @@ export default function WelcomeScreen({
   rememberMe,
   setRememberMe,
   onLogin,
-  onRegister
+  onRegister,
+  isSubmitting,
 }: WelcomeScreenProps) {
   const [slideIndex, setSlideIndex] = useState(0);
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const slides = [
     {
       title: "Your #1 Nightlife Group",
       subtitle: "Find friends who share your vibe and never go to bars alone.",
-      image: require('../../assets/onboarding_groups.png')
+      image: require('../../assets/onboarding_groups.jpg')
     },
     {
       title: "Discover Curated Venues",
       subtitle: "Explore the best wine rooms, rooftops, and karaoke spots in Poblacion and BGC.",
-      image: require('../../assets/onboarding_venues.png')
+      image: require('../../assets/onboarding_venues.jpg')
     },
     {
       title: "Drink Moderately & Stay Safe",
@@ -136,7 +144,15 @@ export default function WelcomeScreen({
 
   /* 2. SCROLLABLE LOGIN FORM (TO PREVENT KEYBOARD OVERLAYS) */
   return (
-    <ScrollView contentContainerStyle={styles.welcomeContainer} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView
+      style={styles.keyboardView}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+    <ScrollView
+      contentContainerStyle={styles.welcomeContainer}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+    >
       <View style={styles.formWrapper}>
         <View style={styles.welcomeHero}>
           <View style={styles.welcomeLogoContainer}>
@@ -168,7 +184,14 @@ export default function WelcomeScreen({
           {isRegister && (
             <>
               <Text style={styles.welcomeInputLabel}>Date of Birth</Text>
-              <TextInput style={styles.welcomeInput} placeholder="YYYY-MM-DD" placeholderTextColor="#6B7280" value={birthDateInput} onChangeText={setBirthDateInput} />
+              <DateTimePickerField
+                value={birthDateInput}
+                onChange={setBirthDateInput}
+                mode="date"
+                placeholder="Select your date of birth"
+                maximumDate={new Date(new Date().setFullYear(new Date().getFullYear() - 18))}
+                defaultDate={new Date(2000, 0, 1)}
+              />
             </>
           )}
 
@@ -197,14 +220,35 @@ export default function WelcomeScreen({
           )}
 
           <Text style={styles.welcomeInputLabel}>Password</Text>
-          <TextInput 
-            style={styles.welcomeInput} 
-            placeholder={isRegister ? 'At least 10 letters and numbers' : 'Enter your password'}
-            placeholderTextColor="#6B7280"
-            secureTextEntry={true}
-            value={passwordInput}
-            onChangeText={setPasswordInput}
-          />
+          <View style={styles.passwordInputRow}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder={isRegister ? 'At least 10 letters and numbers' : 'Enter your password'}
+              placeholderTextColor="#6B7280"
+              secureTextEntry={!showPassword}
+              value={passwordInput}
+              onChangeText={setPasswordInput}
+            />
+            <TouchableOpacity style={styles.passwordToggle} onPress={() => setShowPassword(value => !value)}>
+              <Text style={styles.passwordToggleText}>{showPassword ? 'Hide' : 'Show'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {isRegister && (
+            <>
+              <Text style={styles.welcomeInputLabel}>Confirm Password</Text>
+              <TextInput
+                style={styles.welcomeInput}
+                placeholder="Enter your password again"
+                placeholderTextColor="#6B7280"
+                secureTextEntry={!showPassword}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                returnKeyType="done"
+                onSubmitEditing={() => onRegister(confirmPassword)}
+              />
+            </>
+          )}
 
           {!isRegister && (
             <TouchableOpacity 
@@ -219,14 +263,19 @@ export default function WelcomeScreen({
           )}
 
           <TouchableOpacity 
-            style={styles.welcomeBtn} 
-            onPress={isRegister ? onRegister : onLogin}
+            style={[styles.welcomeBtn, isSubmitting && { opacity: .55 }]}
+            onPress={() => isRegister ? onRegister(confirmPassword) : onLogin()}
+            disabled={isSubmitting}
           >
-            <Text style={styles.welcomeBtnText}>{isRegister ? 'Sign Up' : 'Log In'}</Text>
+            {isSubmitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.welcomeBtnText}>{isRegister ? 'Sign Up' : 'Log In'}</Text>}
           </TouchableOpacity>
 
           <TouchableOpacity 
-            onPress={() => setIsRegister(!isRegister)} 
+            onPress={() => {
+              setIsRegister(value => !value);
+              setConfirmPassword('');
+              setShowPassword(false);
+            }}
             style={{ marginTop: 12 }}
           >
             <Text style={styles.toggleLinkText}>
@@ -244,6 +293,7 @@ export default function WelcomeScreen({
         </View>
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -343,8 +393,12 @@ const styles = StyleSheet.create({
   },
 
   // Form View Layout
+  keyboardView: {
+    flex: 1,
+  },
   welcomeContainer: {
     padding: 30,
+    paddingBottom: 80,
     justifyContent: 'center',
     minHeight: '100%',
     backgroundColor: '#07050E',
@@ -398,6 +452,31 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     marginBottom: 8,
+  },
+  passwordInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.15)',
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: '#FFFFFF',
+    fontSize: 15,
+  },
+  passwordToggle: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  passwordToggleText: {
+    color: '#8B5CF6',
+    fontSize: 13,
+    fontWeight: '700',
   },
   welcomeBtn: {
     backgroundColor: '#8B5CF6',

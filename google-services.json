@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "695300093933",
+    "project_id": "natsvibes-da53f",
+    "storage_bucket": "natsvibes-da53f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:695300093933:android:6c02443dea56120e2699e4",
+        "android_client_info": {
+          "package_name": "com.bkarnzyn.natsvibemobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6yCyGYS-bsRcSGF0x-JId_y2f66EZn28"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

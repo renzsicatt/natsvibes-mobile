@@ -18,6 +18,8 @@ interface HangoutDetailsModalProps {
   onRequestJoin: () => void;
   currentUserName?: string;
   showAlert?: (title: string, message: string) => void;
+  joinRequestStatus?: 'pending' | 'approved' | 'declined' | 'cancelled' | 'withdrawn';
+  canJoin: boolean;
 }
 
 export default function HangoutDetailsModal({
@@ -25,7 +27,9 @@ export default function HangoutDetailsModal({
   onClose,
   onRequestJoin,
   currentUserName,
-  showAlert
+  showAlert,
+  joinRequestStatus,
+  canJoin,
 }: HangoutDetailsModalProps) {
   const isHost = currentUserName && hangout.host.name === currentUserName;
   return (
@@ -106,6 +110,14 @@ export default function HangoutDetailsModal({
             {isHost ? (
               <View style={[styles.modalActionBtn, styles.disabledBtn]}>
                 <Text style={styles.modalActionBtnText}>You are hosting this hangout</Text>
+              </View>
+            ) : joinRequestStatus ? (
+              <View style={[styles.modalActionBtn, styles.disabledBtn]}>
+                <Text style={styles.modalActionBtnText}>Request: {joinRequestStatus.replace('_', ' ')}</Text>
+              </View>
+            ) : !canJoin ? (
+              <View style={[styles.modalActionBtn, styles.disabledBtn]}>
+                <Text style={styles.modalActionBtnText}>Complete verification and profile to join</Text>
               </View>
             ) : (
               <TouchableOpacity 

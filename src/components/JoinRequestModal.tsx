@@ -1,5 +1,6 @@
 import React from 'react';
-import { 
+import {
+  ActivityIndicator,
   StyleSheet, 
   Text, 
   View, 
@@ -14,6 +15,7 @@ interface JoinRequestModalProps {
   setNotes: (notes: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
+  isSubmitting: boolean;
 }
 
 export default function JoinRequestModal({
@@ -21,7 +23,8 @@ export default function JoinRequestModal({
   notes,
   setNotes,
   onSubmit,
-  onCancel
+  onCancel,
+  isSubmitting,
 }: JoinRequestModalProps) {
   return (
     <Modal
@@ -48,8 +51,8 @@ export default function JoinRequestModal({
           />
 
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity style={[styles.submitBtn, { flex: 1, marginTop: 0 }]} onPress={onSubmit}>
-              <Text style={styles.submitBtnText}>Submit Request</Text>
+            <TouchableOpacity style={[styles.submitBtn, { flex: 1, marginTop: 0 }, isSubmitting && { opacity: .55 }]} onPress={onSubmit} disabled={isSubmitting}>
+              {isSubmitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitBtnText}>Submit Request</Text>}
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.venueOption, { flex: 0.5, borderStyle: 'solid', borderColor: 'rgba(255,255,255,0.1)' }]} 

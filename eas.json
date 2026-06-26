@@ -5,7 +5,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE": "https://natsvibes-backend-production.up.railway.app/api"
+        "EXPO_PUBLIC_API_BASE": "http://192.168.1.21:8001/api/v1"
       }
     },
     "production": {
@@ -13,7 +13,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE": "https://natsvibes-backend-production.up.railway.app/api"
+        "EXPO_PUBLIC_API_BASE": "https://natsvibes-backend-production.up.railway.app/api/v1"
       }
     }
   }

@@ -1,9 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import { File } from 'expo-file-system';
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useState } from 'react';
-import type { Hangout, JoinRequest, Message, MyHangout, Profile, Venue } from '../types';
+import { AppState } from 'react-native';
+import { Platform } from 'react-native';
+import type { AppNotification, Hangout, JoinRequest, Message, MyHangout, MyJoinRequest, Profile, Venue, VibeTagOption } from '../types';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
 let authToken: string | null = null;
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: true }),
+});
 
 type Page<T> = { data: T[]; next_cursor?: string | null };
 type Envelope<T> = { data: T; error?: { message?: string; fields?: Record<string, string[]> } };
@@ -13,7 +24,7 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...options,
     headers: {
       Accept: 'application/json',
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(typeof options.body === 'string' ? { 'Content-Type': 'application/json' } : {}),
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...options.headers,
     },
@@ -26,8 +37,24 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   return payload.data;
 }
 
+async function registerPushToken(): Promise<void> {
+  if (!Device.isDevice || !authToken) return;
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', { name: 'NatsVibe', importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 250, 250, 250], lightColor: '#8B5CF6' });
+  }
+  const existing = await Notifications.getPermissionsAsync();
+  const permission = existing.status === 'granted' ? existing : await Notifications.requestPermissionsAsync();
+  if (permission.status !== 'granted') return;
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+  if (!projectId) return;
+  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  await api('/device-tokens', { method: 'POST', body: JSON.stringify({ token, platform: Platform.OS, device_name: Device.deviceName ?? 'mobile' }) });
+}
+
 const emptyProfile: Profile = {
   name: 'Unknown', age: 0, city: '', bio: '', avatar_url: '', is_verified: false, vibe_tags: [],
+  verification_status: 'pending', completion_status: 'incomplete', account_status: 'pending_verification',
+  photo_review_status: 'pending', host_verification_status: 'not_requested',
 };
 
 function profileFromUser(user: any): Profile {
@@ -40,8 +67,13 @@ function profileFromUser(user: any): Profile {
     city: profile.city ?? '',
     bio: profile.bio ?? '',
     avatar_url: profile.avatar_url ? (profile.avatar_url.startsWith('http') ? profile.avatar_url : `${API_BASE.replace('/api/v1', '')}/storage/${profile.avatar_url}`) : '',
-    is_verified: profile.verification_status === 'approved',
+    is_verified: profile.verification_status === 'approved' && profile.photo_review_status === 'approved' && user?.status === 'active',
     vibe_tags: (profile.vibe_tags ?? []).map((tag: any) => typeof tag === 'string' ? tag : tag.name),
+    verification_status: profile.verification_status ?? 'pending',
+    completion_status: profile.completion_status ?? 'incomplete',
+    account_status: user?.status ?? 'pending_verification',
+    photo_review_status: profile.photo_review_status ?? 'pending',
+    host_verification_status: profile.host_verification_status ?? 'not_requested',
   };
 }
 
@@ -88,6 +120,10 @@ export default function useMobileData() {
   const [currentUser, setCurrentUser] = useState<Profile>(emptyProfile);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [hangouts, setHangouts] = useState<Hangout[]>([]);
+  const [vibeTags, setVibeTags] = useState<VibeTagOption[]>([]);
+  const [myJoinRequests, setMyJoinRequests] = useState<MyJoinRequest[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [myHangoutsList, setMyHangoutsList] = useState<MyHangout[]>([]);
   const [activeChatHangout, setActiveChatHangout] = useState<MyHangout | null>(null);
@@ -98,6 +134,7 @@ export default function useMobileData() {
   const [checkInActive, setCheckInActiveState] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const showAlert = useCallback((title: string, message: string) => setCustomAlert({ title, message }), []);
   const hideAlert = useCallback(() => setCustomAlert(null), []);
@@ -106,6 +143,7 @@ export default function useMobileData() {
     authToken = result.token;
     setCurrentUserId(result.user.id); setCurrentUserRole(result.user.role);
     setCurrentUser(profileFromUser(result.user)); setIsLoggedIn(true);
+    void registerPushToken().catch(() => undefined);
     if (persist) {
       await AsyncStorage.multiSet([['@natsvibe:token', result.token], ['@natsvibe:email', result.user.email], ['@natsvibe:remember', 'true']]);
     }
@@ -116,6 +154,18 @@ export default function useMobileData() {
   }, []);
   const fetchHangouts = useCallback(async () => {
     const page = await api<Page<any>>('/hangouts'); setHangouts(page.data.map(hangoutFromApi));
+  }, []);
+  const fetchVibeTags = useCallback(async () => {
+    const page = await api<Page<VibeTagOption> | VibeTagOption[]>('/vibe-tags');
+    setVibeTags(Array.isArray(page) ? page : page.data);
+  }, []);
+  const fetchMyJoinRequests = useCallback(async () => {
+    const page = await api<Page<MyJoinRequest>>('/me/join-requests');
+    setMyJoinRequests(page.data);
+  }, []);
+  const fetchNotifications = useCallback(async () => {
+    const page = await api<Page<AppNotification>>('/notifications');
+    setNotifications(page.data);
   }, []);
   const fetchMyHangouts = useCallback(async () => {
     const page = await api<Page<any>>('/me/hangouts');
@@ -145,10 +195,14 @@ export default function useMobileData() {
 
   const refreshData = useCallback(async () => {
     setIsLoadingData(true); setBackendError(null);
-    try { await Promise.all([fetchVenues(), fetchHangouts(), fetchMyHangouts()]); }
+    try {
+      await Promise.all([fetchVenues(), fetchHangouts(), fetchVibeTags(), fetchMyJoinRequests(), fetchNotifications()]);
+      // Pending accounts can browse, while member-specific data remains active-only.
+      await fetchMyHangouts().catch(() => undefined);
+    }
     catch (reason) { const message = reason instanceof Error ? reason.message : 'Could not connect to backend.'; setBackendError(message); }
     finally { setIsLoadingData(false); }
-  }, [fetchHangouts, fetchMyHangouts, fetchVenues]);
+  }, [fetchHangouts, fetchMyHangouts, fetchMyJoinRequests, fetchNotifications, fetchVenues, fetchVibeTags]);
 
   useEffect(() => {
     void (async () => {
@@ -161,10 +215,31 @@ export default function useMobileData() {
       try {
         const user = await api<any>('/me');
         setCurrentUserId(user.id); setCurrentUserRole(user.role); setCurrentUser(profileFromUser(user)); setIsLoggedIn(true);
+        void registerPushToken().catch(() => undefined);
       } catch { authToken = null; await AsyncStorage.removeItem('@natsvibe:token'); }
     })();
   }, []);
   useEffect(() => { if (isLoggedIn) void refreshData(); }, [isLoggedIn, refreshData]);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const timer = setInterval(() => void fetchNotifications().catch(() => undefined), 5000);
+    return () => clearInterval(timer);
+  }, [fetchNotifications, isLoggedIn]);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        void fetchNotifications().catch(() => undefined);
+        void registerPushToken().catch(() => undefined);
+      }
+    });
+    return () => subscription.remove();
+  }, [fetchNotifications, isLoggedIn]);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const subscription = Notifications.addNotificationReceivedListener(() => void fetchNotifications().catch(() => undefined));
+    return () => subscription.remove();
+  }, [fetchNotifications, isLoggedIn]);
   useEffect(() => {
     if (activeTab !== 'chat' || !activeChatHangout) return;
     void fetchMessages(activeChatHangout.id);
@@ -173,20 +248,28 @@ export default function useMobileData() {
   }, [activeChatHangout, activeTab, fetchMessages]);
 
   const handleLogin = async () => {
+    setPendingAction('login');
     try {
       const result = await api<any>('/auth/login', { method: 'POST', body: JSON.stringify({ email: emailInput.trim().toLowerCase(), password: passwordInput, device_name: 'mobile' }) });
       await acceptSession(result, rememberMe);
     } catch (reason) { showAlert('Login failed', reason instanceof Error ? reason.message : 'Could not authenticate.'); }
+    finally { setPendingAction(null); }
   };
-  const handleRegister = async () => {
+  const handleRegister = async (confirmPassword: string) => {
+    if (passwordInput !== confirmPassword) {
+      showAlert('Passwords do not match', 'Please enter the same password in both fields.');
+      return;
+    }
+    setPendingAction('register');
     try {
       const result = await api<any>('/auth/register', { method: 'POST', body: JSON.stringify({
         name: nameInput.trim(), email: emailInput.trim().toLowerCase(), phone: phoneInput.trim(), date_of_birth: birthDateInput,
-        password: passwordInput, password_confirmation: passwordInput, device_name: 'mobile',
+        password: passwordInput, password_confirmation: confirmPassword, device_name: 'mobile',
       }) });
       await acceptSession(result, rememberMe);
       showAlert('Account created', 'Complete your profile and verification before joining hangouts.');
     } catch (reason) { showAlert('Registration failed', reason instanceof Error ? reason.message : 'Could not register.'); }
+    finally { setPendingAction(null); }
   };
   const handleLogout = async () => {
     await api('/auth/logout', { method: 'POST' }).catch(() => undefined);
@@ -205,11 +288,70 @@ export default function useMobileData() {
   };
   const handleSendRequest = async () => {
     if (!selectedHangout) return;
+    setPendingAction('join-request');
     try {
       await api(`/hangouts/${selectedHangout.id}/join-requests`, { method: 'POST', body: JSON.stringify({ message: joinNotes }) });
+      await fetchMyJoinRequests();
       showAlert('Request sent', 'The host will review your profile.');
     } catch (reason) { showAlert('Could not request', reason instanceof Error ? reason.message : 'Try again.'); }
-    finally { setShowRequestModal(false); setSelectedHangout(null); setJoinNotes(''); }
+    finally { setPendingAction(null); setShowRequestModal(false); setSelectedHangout(null); setJoinNotes(''); }
+  };
+  const refreshAccount = async () => {
+    setPendingAction('refresh-account');
+    try {
+      const user = await api<any>('/me');
+      setCurrentUserId(user.id); setCurrentUserRole(user.role); setCurrentUser(profileFromUser(user));
+      showAlert('Status refreshed', user.status === 'active' ? 'Your account is verified and active.' : 'Your verification is still pending.');
+    } catch (reason) { showAlert('Could not refresh', reason instanceof Error ? reason.message : 'Try again.'); }
+    finally { setPendingAction(null); }
+  };
+  const updateProfile = async (input: { display_name: string; city: string; bio: string; vibe_tag_ids: number[] }) => {
+    setPendingAction('profile');
+    try {
+      await api('/me/profile', { method: 'PUT', body: JSON.stringify(input) });
+      const user = await api<any>('/me');
+      setCurrentUser(profileFromUser(user));
+      showAlert('Profile saved', 'Your profile details have been updated.');
+    } catch (reason) { showAlert('Could not save profile', reason instanceof Error ? reason.message : 'Check your details and try again.'); }
+    finally { setPendingAction(null); }
+  };
+  const uploadProfilePhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) { showAlert('Photo access needed', 'Allow photo access to choose a profile picture.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: .8 });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    const form = new FormData();
+    const photo = new File(asset.uri);
+    form.append('photo', photo, asset.fileName ?? photo.name ?? 'profile.jpg');
+    setPendingAction('photo');
+    try {
+      await api('/me/profile/photo', { method: 'POST', body: form });
+      const user = await api<any>('/me'); setCurrentUser(profileFromUser(user));
+      showAlert('Photo uploaded', 'Your new photo is queued for review.');
+    } catch (reason) { showAlert('Photo upload failed', reason instanceof Error ? reason.message : 'Try another photo.'); }
+    finally { setPendingAction(null); }
+  };
+  const requestHostVerification = async () => {
+    setPendingAction('host-verification');
+    try {
+      await api('/me/host-verification', { method: 'POST' });
+      const user = await api<any>('/me'); setCurrentUser(profileFromUser(user));
+      showAlert('Host request sent', 'An admin will review your host access request.');
+    } catch (reason) { showAlert('Host request unavailable', reason instanceof Error ? reason.message : 'Try again.'); }
+    finally { setPendingAction(null); }
+  };
+  const markNotificationRead = async (id: string) => {
+    await api(`/notifications/${id}/read`, { method: 'POST' });
+    setNotifications(items => items.map(item => item.id === id ? { ...item, read_at: new Date().toISOString() } : item));
+  };
+  const markAllNotificationsRead = async () => {
+    await api('/notifications/read-all', { method: 'POST' });
+    setNotifications(items => items.map(item => ({ ...item, read_at: item.read_at ?? new Date().toISOString() })));
+  };
+  const openNotifications = async () => {
+    setShowNotifications(true);
+    await fetchNotifications().catch(reason => showAlert('Could not refresh notifications', reason instanceof Error ? reason.message : 'Try again.'));
   };
   const handleApprovalAction = async (id: number, status: 'approved' | 'declined') => {
     try { await api(`/join-requests/${id}/${status === 'approved' ? 'approve' : 'decline'}`, { method: 'POST' }); await refreshData(); }
@@ -244,9 +386,11 @@ export default function useMobileData() {
     showRequestModal, setShowRequestModal, joinNotes, setJoinNotes, showApprovalsPanel, setShowApprovalsPanel,
     nameInput, setNameInput, emailInput, setEmailInput, phoneInput, setPhoneInput, passwordInput, setPasswordInput,
     birthDateInput, setBirthDateInput, rememberMe, setRememberMe, currentUser, currentUserRole,
-    venues, hangouts, requests, messages, typedMessage, setTypedMessage, trustedContact, setTrustedContact,
+    venues, hangouts, vibeTags, myJoinRequests, notifications, showNotifications, setShowNotifications, requests, messages, typedMessage, setTypedMessage, trustedContact, setTrustedContact,
     checkInActive, setCheckInActive, isLoadingData, backendError, handleLogin, handleRegister, handleLogout,
     customAlert, showAlert, hideAlert, refreshData, handleCreateGroup, handleSendRequest, handleApprovalAction,
     handleSendChat, myHangoutsList, activeChatHangout, setActiveChatHangout, fetchMyHangouts,
+    pendingAction, refreshAccount, updateProfile, uploadProfilePhoto, requestHostVerification,
+    markNotificationRead, markAllNotificationsRead, openNotifications,
   };
 }
