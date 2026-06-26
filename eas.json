@@ -1,0 +1,20 @@
+{
+  "build": {
+    "apk": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE": "https://natsvibes-backend-production.up.railway.app/api"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE": "https://natsvibes-backend-production.up.railway.app/api"
+      }
+    }
+  }
+}

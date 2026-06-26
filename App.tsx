@@ -70,6 +70,7 @@ function MainApp() {
     checkInActive,
     setCheckInActive,
     handleLogin,
+    handleLogout,
     handleCreateGroup,
     handleSendRequest,
     handleApprovalAction,
@@ -108,7 +109,7 @@ function MainApp() {
                 <MapPin size={12} color="#8B5CF6" />
                 <Text style={styles.areaText}>Poblacion</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setIsLoggedIn(false)}>
+              <TouchableOpacity onPress={handleLogout}>
                 <LogOut size={18} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
