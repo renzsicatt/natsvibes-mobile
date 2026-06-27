@@ -11,11 +11,11 @@ export interface Venue { id: number; name: string; area: string; address: string
 export interface Hangout {
   id: number; host_id?: number; title: string; host: Profile; venue: Venue; date_time: string; area: string;
   group_size_limit: number; members_count: number; budget_range: string; vibe_tags: string[];
-  description: string; members: string[]; status?: string; host_notes?: string; invite_code?: string; is_favorited?: boolean;
+  description: string; members: string[]; member_options?: { id: number; name: string }[]; status?: string; host_notes?: string; invite_code?: string; is_favorited?: boolean;
 }
 export interface JoinRequest { id: number; hangout_id: number; hangout_title: string; user: Profile; notes: string; status: 'pending' | 'approved' | 'declined' }
 export interface MyJoinRequest { id: number; hangout_id: number; status: 'pending' | 'waitlisted' | 'approved' | 'declined' | 'cancelled' | 'withdrawn' }
-export interface MyHangout { id: number; title: string; venue_name: string; members_names: string[]; time_summary: string }
+export interface MyHangout { id: number; title: string; venue_name: string; members_names: string[]; member_options: { id: number; name: string }[]; time_summary: string; status?: string }
 export interface Message { id: number; sender: string; text: string; time: string; isMe: boolean; edited?: boolean; replyText?: string; reactions: { emoji: string; count: number; reacted: boolean }[] }
 export interface AppNotification { id: string; data: { event?: string; hangout_id?: number }; read_at: string | null; created_at: string }
 export interface NotificationPreference {

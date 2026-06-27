@@ -35,6 +35,7 @@ import ApprovalsModal from './src/components/ApprovalsModal';
 import CustomAlertModal from './src/components/CustomAlertModal';
 import NotificationsModal from './src/components/NotificationsModal';
 import ReportModal from './src/components/ReportModal';
+import PeerReviewModal from './src/components/PeerReviewModal';
 
 export default function App() {
   return (
@@ -125,6 +126,11 @@ function MainApp() {
     reactToMessage,
     deleteMessage,
     editMessage
+    ,showReviewModal,
+    setShowReviewModal,
+    submitPeerReview,
+    submitAppeal,
+    currentUserId
   } = useMobileData();
   const unreadNotificationCount = notifications.filter(item => !item.read_at).length;
 
@@ -150,6 +156,7 @@ function MainApp() {
           onLogin={handleLogin}
           onRegister={handleRegister}
           isSubmitting={pendingAction === 'login' || pendingAction === 'register'}
+          onAppeal={submitAppeal}
         />
       ) : (
         /* 2. MAIN LOGGED-IN PORTAL */
@@ -227,6 +234,7 @@ function MainApp() {
                 onEdit={editMessage}
                 onDelete={id => void deleteMessage(id)}
                 onReact={(id, emoji) => void reactToMessage(id, emoji)}
+                onReview={() => setShowReviewModal(true)}
               />
             )}
 
@@ -334,6 +342,7 @@ function MainApp() {
           />
 
           <ReportModal visible={showReportModal} submitting={pendingAction === 'report'} onClose={() => setShowReportModal(false)} onSubmit={reportHangout} />
+          <PeerReviewModal visible={showReviewModal} hangout={activeChatHangout} currentUserId={currentUserId} submitting={pendingAction === 'peer-review'} onClose={() => setShowReviewModal(false)} onSubmit={submitPeerReview} />
 
         </View>
       )}

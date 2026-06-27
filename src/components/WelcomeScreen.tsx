@@ -32,6 +32,7 @@ interface WelcomeScreenProps {
   onLogin: () => void;
   onRegister: (confirmPassword: string) => void;
   isSubmitting: boolean;
+  onAppeal: (statement: string) => void;
 }
 
 export default function WelcomeScreen({
@@ -49,13 +50,15 @@ export default function WelcomeScreen({
   setRememberMe,
   onLogin,
   onRegister,
-  isSubmitting,
+  isSubmitting, onAppeal,
 }: WelcomeScreenProps) {
   const [slideIndex, setSlideIndex] = useState(0);
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showAppeal, setShowAppeal] = useState(false);
+  const [appealStatement, setAppealStatement] = useState('');
 
   const slides = [
     {
@@ -269,6 +272,7 @@ export default function WelcomeScreen({
           >
             {isSubmitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.welcomeBtnText}>{isRegister ? 'Sign Up' : 'Log In'}</Text>}
           </TouchableOpacity>
+          {!isRegister && <><TouchableOpacity onPress={() => setShowAppeal(value => !value)} style={{ marginTop: 12 }}><Text style={styles.toggleLinkText}>Appeal a suspended or banned account</Text></TouchableOpacity>{showAppeal && <><TextInput style={[styles.welcomeInput, { minHeight: 90, textAlignVertical: 'top' }]} multiline value={appealStatement} onChangeText={setAppealStatement} placeholder="Explain why the restriction should be reviewed" placeholderTextColor="#6B7280" /><TouchableOpacity style={[styles.welcomeBtn, appealStatement.trim().length < 20 && { opacity: .45 }]} disabled={appealStatement.trim().length < 20 || isSubmitting} onPress={() => onAppeal(appealStatement.trim())}><Text style={styles.welcomeBtnText}>Submit appeal</Text></TouchableOpacity></>}</>}
 
           <TouchableOpacity 
             onPress={() => {

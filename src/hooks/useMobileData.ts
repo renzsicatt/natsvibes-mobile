@@ -100,6 +100,7 @@ function hangoutFromApi(item: any): Hangout {
     budget_range: item.budget_range ?? (item.budget_min ? `PHP ${item.budget_min}–${item.budget_max ?? item.budget_min}` : '$$'),
     vibe_tags: (item.vibe_tags ?? []).map((tag: any) => typeof tag === 'string' ? tag : tag.name),
     members: members.map((member: any) => member.name ?? member.display_name ?? 'Member'),
+    member_options: members.map((member: any) => ({ id: member.id, name: member.profile?.display_name ?? member.name ?? 'Member' })),
     invite_code: item.invite_code, is_favorited: Boolean(item.is_favorited),
   };
 }
@@ -136,6 +137,7 @@ export default function useMobileData() {
   const [typedMessage, setTypedMessage] = useState('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const [trustedContact, setTrustedContactState] = useState({ name: '', phone: '' });
   const [trustedContactId, setTrustedContactId] = useState<number | null>(null);
   const [checkInActive, setCheckInActiveState] = useState(false);
@@ -192,6 +194,7 @@ export default function useMobileData() {
     const choices: MyHangout[] = list.map(item => ({
       id: item.id, title: item.title, venue_name: item.venue.name,
       members_names: item.members, time_summary: new Date(item.date_time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      member_options: item.member_options ?? [], status: item.status,
     }));
     setMyHangoutsList(choices);
     setActiveChatHangout(previous => choices.find(item => item.id === previous?.id) ?? choices[0] ?? null);
@@ -324,6 +327,14 @@ export default function useMobileData() {
     } catch (reason) { showAlert('Registration failed', reason instanceof Error ? reason.message : 'Could not register.'); }
     finally { setPendingAction(null); }
   };
+  const submitAppeal = async (statement: string) => {
+    setPendingAction('appeal');
+    try {
+      await api('/auth/appeals', { method: 'POST', body: JSON.stringify({ email: emailInput.trim().toLowerCase(), password: passwordInput, statement }) });
+      showAlert('Appeal submitted', 'The safety team will review your request.');
+    } catch (reason) { showAlert('Appeal unavailable', reason instanceof Error ? reason.message : 'Try again.'); }
+    finally { setPendingAction(null); }
+  };
   const handleLogout = async () => {
     await api('/auth/logout', { method: 'POST' }).catch(() => undefined);
     authToken = null; await AsyncStorage.removeItem('@natsvibe:token');
@@ -452,6 +463,13 @@ export default function useMobileData() {
     if (!hangout.invite_code) { showAlert('Invite unavailable', 'Refresh this hangout and try again.'); return; }
     await Share.share({ title: hangout.title, message: `Join ${hangout.title} on NatsVibe: natsvibe://hangouts/${hangout.invite_code}` });
   };
+  const submitPeerReview = async (input: { reviewed_user_id: number; rating: number; attendance: 'attended' | 'no_show' | 'cancelled'; safety_concern: boolean; private_notes: string }) => {
+    if (!activeChatHangout) return;
+    setPendingAction('peer-review');
+    try { await api(`/hangouts/${activeChatHangout.id}/peer-reviews`, { method: 'POST', body: JSON.stringify(input) }); setShowReviewModal(false); showAlert('Review saved', 'Thanks for helping keep the community accountable.'); }
+    catch (reason) { showAlert('Review failed', reason instanceof Error ? reason.message : 'Try again.'); }
+    finally { setPendingAction(null); }
+  };
   const handleApprovalAction = async (id: number, status: 'approved' | 'declined') => {
     try { await api(`/join-requests/${id}/${status === 'approved' ? 'approve' : 'decline'}`, { method: 'POST' }); await refreshData(); }
     catch (reason) { showAlert('Could not update request', reason instanceof Error ? reason.message : 'Try again.'); }
@@ -497,12 +515,12 @@ export default function useMobileData() {
     isLoggedIn, setIsLoggedIn, activeTab, setActiveTab, selectedHangout, setSelectedHangout,
     showRequestModal, setShowRequestModal, joinNotes, setJoinNotes, showApprovalsPanel, setShowApprovalsPanel,
     nameInput, setNameInput, emailInput, setEmailInput, phoneInput, setPhoneInput, passwordInput, setPasswordInput,
-    birthDateInput, setBirthDateInput, rememberMe, setRememberMe, currentUser, currentUserRole,
-    venues, hangouts, vibeTags, myJoinRequests, notifications, notificationPreferences, showNotifications, setShowNotifications, showReportModal, setShowReportModal, requests, messages, typedMessage, setTypedMessage, replyingTo, setReplyingTo, editingMessageId, setEditingMessageId, trustedContact, setTrustedContact,
+    birthDateInput, setBirthDateInput, rememberMe, setRememberMe, currentUserId, currentUser, currentUserRole,
+    venues, hangouts, vibeTags, myJoinRequests, notifications, notificationPreferences, showNotifications, setShowNotifications, showReportModal, setShowReportModal, showReviewModal, setShowReviewModal, requests, messages, typedMessage, setTypedMessage, replyingTo, setReplyingTo, editingMessageId, setEditingMessageId, trustedContact, setTrustedContact,
     checkInActive, setCheckInActive, isLoadingData, backendError, handleLogin, handleRegister, handleLogout,
     customAlert, showAlert, hideAlert, refreshData, handleCreateGroup, handleSendRequest, handleApprovalAction,
     handleSendChat, reactToMessage, deleteMessage, editMessage, myHangoutsList, activeChatHangout, setActiveChatHangout, fetchMyHangouts,
-    pendingAction, refreshAccount, updateProfile, uploadProfilePhoto, requestHostVerification,
+    pendingAction, refreshAccount, updateProfile, uploadProfilePhoto, requestHostVerification, submitAppeal, submitPeerReview,
     markNotificationRead, markAllNotificationsRead, openNotifications, updateNotificationPreference, reportHangout, requestAccountDeletion, toggleFavorite, shareHangout,
   };
 }

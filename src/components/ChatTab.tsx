@@ -25,6 +25,7 @@ interface ChatTabProps {
   onEdit: (message: Message) => void;
   onDelete: (id: number) => void;
   onReact: (id: number, emoji: string) => void;
+  onReview: () => void;
 }
 
 export default function ChatTab({
@@ -35,7 +36,7 @@ export default function ChatTab({
   activeChatHangout,
   myHangoutsList,
   onSelectHangout,
-  onNavigateToDiscover, replyingTo, editingMessageId, onReply, onEdit, onDelete, onReact
+  onNavigateToDiscover, replyingTo, editingMessageId, onReply, onEdit, onDelete, onReact, onReview
 }: ChatTabProps) {
   
   if (!activeChatHangout) {
@@ -93,6 +94,7 @@ export default function ChatTab({
         <Text style={styles.chatHeaderSubtitle} numberOfLines={1}>
           {activeChatHangout.members_names.join(', ')} • {activeChatHangout.time_summary}
         </Text>
+        {activeChatHangout.status === 'completed' && <TouchableOpacity onPress={onReview}><Text style={styles.reviewLink}>Review members</Text></TouchableOpacity>}
       </View>
       
       {/* 3. Messages List */}
@@ -188,6 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 3,
   },
+  reviewLink: { color: '#A78BFA', fontWeight: '700', fontSize: 12, marginTop: 8 },
   messagesList: {
     padding: 16,
     flexGrow: 1,
