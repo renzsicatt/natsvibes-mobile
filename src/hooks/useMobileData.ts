@@ -11,6 +11,7 @@ import type { AppNotification, Hangout, JoinRequest, Message, MyHangout, MyJoinR
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
 let authToken: string | null = null;
+let onUnauthorized: (() => void) | null = null;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: true }),
@@ -31,6 +32,7 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
   const payload = (await response.json().catch(() => ({}))) as Envelope<T>;
   if (!response.ok) {
+    if (response.status === 401) onUnauthorized?.();
     const fieldError = payload.error?.fields ? Object.values(payload.error.fields).flat()[0] : null;
     throw new Error(fieldError ?? payload.error?.message ?? `Backend request failed (${response.status})`);
   }
@@ -141,6 +143,15 @@ export default function useMobileData() {
 
   const showAlert = useCallback((title: string, message: string) => setCustomAlert({ title, message }), []);
   const hideAlert = useCallback(() => setCustomAlert(null), []);
+
+  useEffect(() => {
+    onUnauthorized = () => {
+      authToken = null; void AsyncStorage.removeItem('@natsvibe:token');
+      setIsLoggedIn(false); setCurrentUserId(0); setCurrentUser(emptyProfile);
+      showAlert('Session ended', 'Your access changed or your session expired. Sign in again for details.');
+    };
+    return () => { onUnauthorized = null; };
+  }, [showAlert]);
 
   const acceptSession = useCallback(async (result: any, persist: boolean) => {
     authToken = result.token;

@@ -58,8 +58,8 @@ export default function ProfileTab({
 
       {!verified && (
         <View style={styles.noticeCard}>
-          <Text style={styles.noticeTitle}>Your profile is under review</Text>
-          <Text style={styles.noticeText}>You can browse now. Complete your profile, then wait for admin approval before joining or hosting.</Text>
+          <Text style={styles.noticeTitle}>{currentUser.account_status === 'pending_verification' ? 'Your profile is under review' : `Account status: ${currentUser.account_status.replace('_', ' ')}`}</Text>
+          <Text style={styles.noticeText}>{currentUser.account_status === 'pending_verification' ? 'You can browse now. Complete your profile, then wait for admin approval before joining or hosting.' : 'Community actions are unavailable for this account. Contact support if you need help.'}</Text>
           <TouchableOpacity style={styles.secondaryButton} onPress={onRefreshStatus} disabled={isRefreshing}>
             {isRefreshing ? <ActivityIndicator color="#8B5CF6" /> : <Text style={styles.secondaryButtonText}>Refresh verification status</Text>}
           </TouchableOpacity>
