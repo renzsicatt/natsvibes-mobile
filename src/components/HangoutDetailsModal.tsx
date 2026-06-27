@@ -20,6 +20,7 @@ interface HangoutDetailsModalProps {
   showAlert?: (title: string, message: string) => void;
   joinRequestStatus?: 'pending' | 'approved' | 'declined' | 'cancelled' | 'withdrawn';
   canJoin: boolean;
+  onReport: () => void;
 }
 
 export default function HangoutDetailsModal({
@@ -30,6 +31,7 @@ export default function HangoutDetailsModal({
   showAlert,
   joinRequestStatus,
   canJoin,
+  onReport,
 }: HangoutDetailsModalProps) {
   const isHost = currentUserName && hangout.host.name === currentUserName;
   return (
@@ -79,6 +81,8 @@ export default function HangoutDetailsModal({
                 </View>
               </View>
             )}
+
+            {!isHost && <TouchableOpacity style={styles.reportButton} onPress={onReport}><Text style={styles.reportButtonText}>Report this hangout</Text></TouchableOpacity>}
 
             {/* Host Bio */}
             <View style={[styles.modalSection, styles.hostBioCard]}>
@@ -259,4 +263,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  reportButton: { paddingVertical: 14, alignItems: 'center' }, reportButtonText: { color: '#F87171', fontWeight: '700', fontSize: 13 },
 });

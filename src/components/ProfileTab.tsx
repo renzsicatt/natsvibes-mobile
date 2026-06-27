@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Check, Clock3, ShieldCheck, UserCheck } from 'lucide-react-native';
 import type { Profile, VibeTagOption } from '../types';
 
@@ -14,13 +14,14 @@ interface ProfileTabProps {
   onRefreshStatus: () => void;
   onUploadPhoto: () => void;
   onRequestHost: () => void;
+  onDeleteAccount: () => void;
   onSave: (input: { display_name: string; city: string; bio: string; vibe_tag_ids: number[] }) => void;
 }
 
 export default function ProfileTab({
   currentUser, currentUserRole, vibeTags, pendingApprovalsCount, isSaving, isRefreshing,
   onShowApprovals, onRefreshStatus, onSave,
-  onUploadPhoto, onRequestHost,
+  onUploadPhoto, onRequestHost, onDeleteAccount,
 }: ProfileTabProps) {
   const [name, setName] = useState(currentUser.name);
   const [city, setCity] = useState(currentUser.city);
@@ -106,6 +107,9 @@ export default function ProfileTab({
             </TouchableOpacity>
           </View>
         )}
+        <TouchableOpacity style={styles.deleteButton} onPress={() => Alert.alert('Delete account?', 'You will be signed out immediately. Your data will be anonymized after the retention period.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Schedule deletion', style: 'destructive', onPress: onDeleteAccount }])}>
+          <Text style={styles.deleteButtonText}>Delete my account</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -146,4 +150,5 @@ const styles = StyleSheet.create({
   saveButton: { backgroundColor: '#8B5CF6', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   saveButtonText: { color: '#FFFFFF', fontWeight: '800' }, disabled: { opacity: .45 },
   hostCard: { marginTop: 20, paddingTop: 18, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,.08)' },
+  deleteButton: { marginTop: 24, paddingVertical: 12, borderTopWidth: 1, borderTopColor: 'rgba(239,68,68,.25)', alignItems: 'center' }, deleteButtonText: { color: '#F87171', fontWeight: '700' },
 });

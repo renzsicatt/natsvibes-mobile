@@ -7,7 +7,7 @@ import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { Platform } from 'react-native';
-import type { AppNotification, Hangout, JoinRequest, Message, MyHangout, MyJoinRequest, Profile, Venue, VibeTagOption } from '../types';
+import type { AppNotification, Hangout, JoinRequest, Message, MyHangout, MyJoinRequest, NotificationPreference, Profile, Venue, VibeTagOption } from '../types';
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
 let authToken: string | null = null;
@@ -124,6 +124,8 @@ export default function useMobileData() {
   const [myJoinRequests, setMyJoinRequests] = useState<MyJoinRequest[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreference>({ push_enabled: true, email_enabled: true, join_updates: true, hangout_updates: true, safety_updates: true });
+  const [showReportModal, setShowReportModal] = useState(false);
   const [requests, setRequests] = useState<JoinRequest[]>([]);
   const [myHangoutsList, setMyHangoutsList] = useState<MyHangout[]>([]);
   const [activeChatHangout, setActiveChatHangout] = useState<MyHangout | null>(null);
@@ -167,6 +169,9 @@ export default function useMobileData() {
     const page = await api<Page<AppNotification>>('/notifications');
     setNotifications(page.data);
   }, []);
+  const fetchNotificationPreferences = useCallback(async () => {
+    setNotificationPreferences(await api<NotificationPreference>('/notification-preferences'));
+  }, []);
   const fetchMyHangouts = useCallback(async () => {
     const page = await api<Page<any>>('/me/hangouts');
     const list = page.data.map(hangoutFromApi);
@@ -196,13 +201,13 @@ export default function useMobileData() {
   const refreshData = useCallback(async () => {
     setIsLoadingData(true); setBackendError(null);
     try {
-      await Promise.all([fetchVenues(), fetchHangouts(), fetchVibeTags(), fetchMyJoinRequests(), fetchNotifications()]);
+      await Promise.all([fetchVenues(), fetchHangouts(), fetchVibeTags(), fetchMyJoinRequests(), fetchNotifications(), fetchNotificationPreferences()]);
       // Pending accounts can browse, while member-specific data remains active-only.
       await fetchMyHangouts().catch(() => undefined);
     }
     catch (reason) { const message = reason instanceof Error ? reason.message : 'Could not connect to backend.'; setBackendError(message); }
     finally { setIsLoadingData(false); }
-  }, [fetchHangouts, fetchMyHangouts, fetchMyJoinRequests, fetchNotifications, fetchVenues, fetchVibeTags]);
+  }, [fetchHangouts, fetchMyHangouts, fetchMyJoinRequests, fetchNotificationPreferences, fetchNotifications, fetchVenues, fetchVibeTags]);
 
   useEffect(() => {
     void (async () => {
@@ -225,6 +230,22 @@ export default function useMobileData() {
     const timer = setInterval(() => void fetchNotifications().catch(() => undefined), 5000);
     return () => clearInterval(timer);
   }, [fetchNotifications, isLoggedIn]);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const open = (notification: Notifications.Notification) => {
+      const hangoutId = notification.request.content.data?.hangout_id;
+      if (typeof hangoutId === 'number') {
+        setActiveTab('chat');
+        setActiveChatHangout(items => items?.id === hangoutId ? items : myHangoutsList.find(item => item.id === hangoutId) ?? items);
+      } else {
+        setShowNotifications(true);
+      }
+    };
+    const previous = Notifications.getLastNotificationResponse();
+    if (previous?.notification) open(previous.notification);
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => open(response.notification));
+    return () => subscription.remove();
+  }, [isLoggedIn, myHangoutsList]);
   useEffect(() => {
     if (!isLoggedIn) return;
     const subscription = AppState.addEventListener('change', state => {
@@ -353,6 +374,39 @@ export default function useMobileData() {
     setShowNotifications(true);
     await fetchNotifications().catch(reason => showAlert('Could not refresh notifications', reason instanceof Error ? reason.message : 'Try again.'));
   };
+  const updateNotificationPreference = async (field: keyof NotificationPreference, value: boolean) => {
+    const previous = notificationPreferences;
+    setNotificationPreferences(current => ({ ...current, [field]: value }));
+    try {
+      setNotificationPreferences(await api<NotificationPreference>('/notification-preferences', { method: 'PUT', body: JSON.stringify({ [field]: value }) }));
+    } catch (reason) {
+      setNotificationPreferences(previous);
+      showAlert('Could not update preference', reason instanceof Error ? reason.message : 'Try again.');
+    }
+  };
+  const reportHangout = async (input: { reason: string; details: string; evidence?: { uri: string; name: string } }) => {
+    if (!selectedHangout) return;
+    const form = new FormData();
+    form.append('reported_hangout_id', String(selectedHangout.id));
+    form.append('reason', input.reason);
+    form.append('details', input.details);
+    if (input.evidence) form.append('evidence[]', new File(input.evidence.uri), input.evidence.name);
+    setPendingAction('report');
+    try {
+      await api('/reports', { method: 'POST', body: form });
+      setShowReportModal(false); setSelectedHangout(null);
+      showAlert('Report submitted', 'Our safety team will review it privately.');
+    } catch (reason) { showAlert('Report failed', reason instanceof Error ? reason.message : 'Try again.'); }
+    finally { setPendingAction(null); }
+  };
+  const requestAccountDeletion = async () => {
+    setPendingAction('delete-account');
+    try {
+      await api('/me', { method: 'DELETE' });
+      authToken = null; await AsyncStorage.removeItem('@natsvibe:token'); setIsLoggedIn(false);
+    } catch (reason) { showAlert('Could not schedule deletion', reason instanceof Error ? reason.message : 'Try again.'); }
+    finally { setPendingAction(null); }
+  };
   const handleApprovalAction = async (id: number, status: 'approved' | 'declined') => {
     try { await api(`/join-requests/${id}/${status === 'approved' ? 'approve' : 'decline'}`, { method: 'POST' }); await refreshData(); }
     catch (reason) { showAlert('Could not update request', reason instanceof Error ? reason.message : 'Try again.'); }
@@ -386,11 +440,11 @@ export default function useMobileData() {
     showRequestModal, setShowRequestModal, joinNotes, setJoinNotes, showApprovalsPanel, setShowApprovalsPanel,
     nameInput, setNameInput, emailInput, setEmailInput, phoneInput, setPhoneInput, passwordInput, setPasswordInput,
     birthDateInput, setBirthDateInput, rememberMe, setRememberMe, currentUser, currentUserRole,
-    venues, hangouts, vibeTags, myJoinRequests, notifications, showNotifications, setShowNotifications, requests, messages, typedMessage, setTypedMessage, trustedContact, setTrustedContact,
+    venues, hangouts, vibeTags, myJoinRequests, notifications, notificationPreferences, showNotifications, setShowNotifications, showReportModal, setShowReportModal, requests, messages, typedMessage, setTypedMessage, trustedContact, setTrustedContact,
     checkInActive, setCheckInActive, isLoadingData, backendError, handleLogin, handleRegister, handleLogout,
     customAlert, showAlert, hideAlert, refreshData, handleCreateGroup, handleSendRequest, handleApprovalAction,
     handleSendChat, myHangoutsList, activeChatHangout, setActiveChatHangout, fetchMyHangouts,
     pendingAction, refreshAccount, updateProfile, uploadProfilePhoto, requestHostVerification,
-    markNotificationRead, markAllNotificationsRead, openNotifications,
+    markNotificationRead, markAllNotificationsRead, openNotifications, updateNotificationPreference, reportHangout, requestAccountDeletion,
   };
 }

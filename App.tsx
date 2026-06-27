@@ -34,6 +34,7 @@ import JoinRequestModal from './src/components/JoinRequestModal';
 import ApprovalsModal from './src/components/ApprovalsModal';
 import CustomAlertModal from './src/components/CustomAlertModal';
 import NotificationsModal from './src/components/NotificationsModal';
+import ReportModal from './src/components/ReportModal';
 
 export default function App() {
   return (
@@ -109,6 +110,12 @@ function MainApp() {
     markNotificationRead,
     markAllNotificationsRead
     ,openNotifications
+    ,notificationPreferences,
+    updateNotificationPreference,
+    showReportModal,
+    setShowReportModal,
+    reportHangout,
+    requestAccountDeletion
   } = useMobileData();
   const unreadNotificationCount = notifications.filter(item => !item.read_at).length;
 
@@ -229,6 +236,7 @@ function MainApp() {
                 onSave={updateProfile}
                 onUploadPhoto={uploadProfilePhoto}
                 onRequestHost={requestHostVerification}
+                onDeleteAccount={requestAccountDeletion}
                 isSaving={pendingAction === 'profile' || pendingAction === 'photo'}
                 isRefreshing={pendingAction === 'refresh-account' || pendingAction === 'host-verification'}
               />
@@ -274,6 +282,7 @@ function MainApp() {
               showAlert={showAlert}
               joinRequestStatus={myJoinRequests.find(request => request.hangout_id === selectedHangout.id)?.status}
               canJoin={currentUser.account_status === 'active' && currentUser.completion_status === 'completed'}
+              onReport={() => setShowReportModal(true)}
             />
           )}
 
@@ -301,7 +310,11 @@ function MainApp() {
             onClose={() => setShowNotifications(false)}
             onRead={markNotificationRead}
             onReadAll={markAllNotificationsRead}
+            preferences={notificationPreferences}
+            onPreferenceChange={updateNotificationPreference}
           />
+
+          <ReportModal visible={showReportModal} submitting={pendingAction === 'report'} onClose={() => setShowReportModal(false)} onSubmit={reportHangout} />
 
         </View>
       )}
