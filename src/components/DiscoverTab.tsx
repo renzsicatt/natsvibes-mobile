@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -7,22 +7,26 @@ import {
   TouchableOpacity, 
   Image 
 } from 'react-native';
-import { MapPin, Calendar, Users, Map } from 'lucide-react-native';
+import { MapPin, Calendar, Users, Map, Heart } from 'lucide-react-native';
 import type { Hangout } from '../types';
 
 interface DiscoverTabProps {
   hangouts: Hangout[];
   onSelectHangout: (hangout: Hangout) => void;
+  onToggleFavorite: (hangout: Hangout) => void;
 }
 
 export default function DiscoverTab({
   hangouts,
-  onSelectHangout
+  onSelectHangout, onToggleFavorite
 }: DiscoverTabProps) {
+  const [savedOnly, setSavedOnly] = useState(false);
+  const visibleHangouts = savedOnly ? hangouts.filter(item => item.is_favorited) : hangouts;
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
       <Text style={styles.sectionTitle}>Upcoming Vibes</Text>
       <Text style={styles.sectionSubtitle}>Select a verified hangout to view details</Text>
+      <TouchableOpacity style={[styles.savedFilter, savedOnly && styles.savedFilterActive]} onPress={() => setSavedOnly(value => !value)}><Heart size={14} color={savedOnly ? '#FFF' : '#A78BFA'} fill={savedOnly ? '#FFF' : 'transparent'} /><Text style={styles.savedFilterText}>{savedOnly ? 'Showing saved' : 'Show saved'}</Text></TouchableOpacity>
 
       {/* Map Card Preview */}
       <View style={styles.mapCard}>
@@ -42,7 +46,7 @@ export default function DiscoverTab({
       </View>
 
       {/* Hangouts List */}
-      {hangouts.map(hangout => (
+      {visibleHangouts.map(hangout => (
         <TouchableOpacity 
           key={hangout.id} 
           style={styles.hangoutCard}
@@ -50,7 +54,7 @@ export default function DiscoverTab({
         >
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>{hangout.title}</Text>
-            <View style={styles.priceBadge}>
+            <TouchableOpacity style={styles.favoriteButton} onPress={event => { event.stopPropagation(); onToggleFavorite(hangout); }}><Heart size={18} color="#EC4899" fill={hangout.is_favorited ? '#EC4899' : 'transparent'} /></TouchableOpacity><View style={styles.priceBadge}>
               <Text style={styles.priceText}>{hangout.budget_range}</Text>
             </View>
           </View>
@@ -83,7 +87,7 @@ export default function DiscoverTab({
         </TouchableOpacity>
       ))}
 
-      {hangouts.length === 0 && (
+      {visibleHangouts.length === 0 && (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No hangouts found. Host the first one!</Text>
         </View>
@@ -110,6 +114,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'left',
   },
+  savedFilter: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(139,92,246,.3)', marginBottom: 14 },
+  savedFilterActive: { backgroundColor: '#7C3AED' }, savedFilterText: { color: '#D1D5DB', fontWeight: '700', fontSize: 12 }, favoriteButton: { padding: 5, marginRight: 4 },
   mapCard: {
     backgroundColor: '#120E22',
     borderRadius: 16,

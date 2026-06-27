@@ -9,7 +9,7 @@ import {
   Modal, 
   Alert 
 } from 'react-native';
-import { MapPin } from 'lucide-react-native';
+import { Heart, MapPin, Share2 } from 'lucide-react-native';
 import type { Hangout } from '../types';
 
 interface HangoutDetailsModalProps {
@@ -18,9 +18,12 @@ interface HangoutDetailsModalProps {
   onRequestJoin: () => void;
   currentUserName?: string;
   showAlert?: (title: string, message: string) => void;
-  joinRequestStatus?: 'pending' | 'approved' | 'declined' | 'cancelled' | 'withdrawn';
+  joinRequestStatus?: 'pending' | 'waitlisted' | 'approved' | 'declined' | 'cancelled' | 'withdrawn';
   canJoin: boolean;
   onReport: () => void;
+  onToggleFavorite: () => void;
+  onToggleVenueFavorite: () => void;
+  onShare: () => void;
 }
 
 export default function HangoutDetailsModal({
@@ -31,7 +34,7 @@ export default function HangoutDetailsModal({
   showAlert,
   joinRequestStatus,
   canJoin,
-  onReport,
+  onReport, onToggleFavorite, onToggleVenueFavorite, onShare,
 }: HangoutDetailsModalProps) {
   const isHost = currentUserName && hangout.host.name === currentUserName;
   return (
@@ -53,12 +56,14 @@ export default function HangoutDetailsModal({
           </View>
 
           <ScrollView style={{ padding: 20 }}>
+            <View style={styles.quickActions}><TouchableOpacity style={styles.quickButton} onPress={onToggleFavorite}><Heart size={16} color="#EC4899" fill={hangout.is_favorited ? '#EC4899' : 'transparent'} /><Text style={styles.quickText}>{hangout.is_favorited ? 'Saved' : 'Save group'}</Text></TouchableOpacity><TouchableOpacity style={styles.quickButton} onPress={onShare}><Share2 size={16} color="#A78BFA" /><Text style={styles.quickText}>Share invite</Text></TouchableOpacity></View>
             
             {/* Location Card */}
             <View style={styles.modalSection}>
               <Text style={styles.modalLabel}>Meeting Venue</Text>
               <Text style={styles.modalTextBig}>{hangout.venue.name}</Text>
               <Text style={styles.modalTextSub}>{hangout.venue.address} ({hangout.venue.venue_type})</Text>
+              <TouchableOpacity onPress={onToggleVenueFavorite}><Text style={styles.saveVenue}>{hangout.venue.is_favorited ? '♥ Saved venue' : '♡ Save venue'}</Text></TouchableOpacity>
               <TouchableOpacity onPress={() => showAlert ? showAlert('External Link', 'Redirecting to Google Maps...') : Alert.alert('External Link', 'Redirecting to Google Maps...')} style={styles.mapsLinkBtn}>
                 <MapPin size={12} color="#8B5CF6" />
                 <Text style={styles.mapsLinkBtnText}>Open in Google Maps</Text>
@@ -128,7 +133,7 @@ export default function HangoutDetailsModal({
                 style={styles.modalActionBtn}
                 onPress={onRequestJoin}
               >
-                <Text style={styles.modalActionBtnText}>Request to Join Group</Text>
+                <Text style={styles.modalActionBtnText}>{hangout.status === 'full' ? 'Join Waitlist' : 'Request to Join Group'}</Text>
               </TouchableOpacity>
             )}
 
@@ -264,4 +269,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   reportButton: { paddingVertical: 14, alignItems: 'center' }, reportButtonText: { color: '#F87171', fontWeight: '700', fontSize: 13 },
+  quickActions: { flexDirection: 'row', gap: 8, marginBottom: 16 }, quickButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10, backgroundColor: '#120E22' }, quickText: { color: '#D1D5DB', fontWeight: '700', fontSize: 12 }, saveVenue: { color: '#EC4899', fontWeight: '700', marginTop: 8 },
 });

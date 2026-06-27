@@ -115,7 +115,9 @@ function MainApp() {
     showReportModal,
     setShowReportModal,
     reportHangout,
-    requestAccountDeletion
+    requestAccountDeletion,
+    toggleFavorite,
+    shareHangout
   } = useMobileData();
   const unreadNotificationCount = notifications.filter(item => !item.read_at).length;
 
@@ -189,6 +191,7 @@ function MainApp() {
               <DiscoverTab 
                 hangouts={hangouts}
                 onSelectHangout={setSelectedHangout}
+                onToggleFavorite={hangout => void toggleFavorite('hangouts', hangout.id, Boolean(hangout.is_favorited))}
               />
             )}
 
@@ -283,6 +286,9 @@ function MainApp() {
               joinRequestStatus={myJoinRequests.find(request => request.hangout_id === selectedHangout.id)?.status}
               canJoin={currentUser.account_status === 'active' && currentUser.completion_status === 'completed'}
               onReport={() => setShowReportModal(true)}
+              onToggleFavorite={() => void toggleFavorite('hangouts', selectedHangout.id, Boolean(selectedHangout.is_favorited))}
+              onToggleVenueFavorite={() => void toggleFavorite('venues', selectedHangout.venue.id, Boolean(selectedHangout.venue.is_favorited))}
+              onShare={() => void shareHangout(selectedHangout)}
             />
           )}
 

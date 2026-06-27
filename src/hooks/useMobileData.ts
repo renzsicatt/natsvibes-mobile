@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Linking, Share } from 'react-native';
 import { Platform } from 'react-native';
 import type { AppNotification, Hangout, JoinRequest, Message, MyHangout, MyJoinRequest, NotificationPreference, Profile, Venue, VibeTagOption } from '../types';
 
@@ -83,7 +83,7 @@ function venueFromApi(venue: any): Venue {
     venue_type: venue.venue_type,
     price_range: venue.price_range ?? (venue.budget_min ? `PHP ${venue.budget_min}–${venue.budget_max ?? venue.budget_min}` : '$$'),
     reservation_required: Boolean(venue.reservation_required),
-    photos: venue.photos ?? [],
+    photos: venue.photos ?? [], is_favorited: Boolean(venue.is_favorited),
   };
 }
 
@@ -98,6 +98,7 @@ function hangoutFromApi(item: any): Hangout {
     budget_range: item.budget_range ?? (item.budget_min ? `PHP ${item.budget_min}–${item.budget_max ?? item.budget_min}` : '$$'),
     vibe_tags: (item.vibe_tags ?? []).map((tag: any) => typeof tag === 'string' ? tag : tag.name),
     members: members.map((member: any) => member.name ?? member.display_name ?? 'Member'),
+    invite_code: item.invite_code, is_favorited: Boolean(item.is_favorited),
   };
 }
 
@@ -262,6 +263,20 @@ export default function useMobileData() {
     return () => subscription.remove();
   }, [fetchNotifications, isLoggedIn]);
   useEffect(() => {
+    if (!isLoggedIn) return;
+    const openInvite = async (url: string | null) => {
+      const code = url?.match(/^natsvibe:\/\/hangouts\/([a-z0-9]+)/i)?.[1];
+      if (!code) return;
+      try {
+        const result = await api<{ hangout: any }>(`/invites/${code}`);
+        setSelectedHangout(hangoutFromApi(result.hangout)); setActiveTab('discover');
+      } catch (reason) { showAlert('Invite unavailable', reason instanceof Error ? reason.message : 'This invite may have expired.'); }
+    };
+    void Linking.getInitialURL().then(openInvite);
+    const subscription = Linking.addEventListener('url', event => void openInvite(event.url));
+    return () => subscription.remove();
+  }, [isLoggedIn, showAlert]);
+  useEffect(() => {
     if (activeTab !== 'chat' || !activeChatHangout) return;
     void fetchMessages(activeChatHangout.id);
     const timer = setInterval(() => void fetchMessages(activeChatHangout.id), 5000);
@@ -311,9 +326,9 @@ export default function useMobileData() {
     if (!selectedHangout) return;
     setPendingAction('join-request');
     try {
-      await api(`/hangouts/${selectedHangout.id}/join-requests`, { method: 'POST', body: JSON.stringify({ message: joinNotes }) });
+      const result = await api<{ status: string }>(`/hangouts/${selectedHangout.id}/join-requests`, { method: 'POST', body: JSON.stringify({ message: joinNotes }) });
       await fetchMyJoinRequests();
-      showAlert('Request sent', 'The host will review your profile.');
+      showAlert(result.status === 'waitlisted' ? 'Added to waitlist' : 'Request sent', result.status === 'waitlisted' ? 'We will notify you when a spot opens.' : 'The host will review your profile.');
     } catch (reason) { showAlert('Could not request', reason instanceof Error ? reason.message : 'Try again.'); }
     finally { setPendingAction(null); setShowRequestModal(false); setSelectedHangout(null); setJoinNotes(''); }
   };
@@ -407,6 +422,19 @@ export default function useMobileData() {
     } catch (reason) { showAlert('Could not schedule deletion', reason instanceof Error ? reason.message : 'Try again.'); }
     finally { setPendingAction(null); }
   };
+  const toggleFavorite = async (kind: 'hangouts' | 'venues', id: number, favorited: boolean) => {
+    await api(`/${kind}/${id}/favorite`, { method: favorited ? 'DELETE' : 'POST' });
+    if (kind === 'hangouts') {
+      setHangouts(items => items.map(item => item.id === id ? { ...item, is_favorited: !favorited } : item));
+      setSelectedHangout(item => item?.id === id ? { ...item, is_favorited: !favorited } : item);
+    } else {
+      setSelectedHangout(item => item?.venue.id === id ? { ...item, venue: { ...item.venue, is_favorited: !favorited } } : item);
+    }
+  };
+  const shareHangout = async (hangout: Hangout) => {
+    if (!hangout.invite_code) { showAlert('Invite unavailable', 'Refresh this hangout and try again.'); return; }
+    await Share.share({ title: hangout.title, message: `Join ${hangout.title} on NatsVibe: natsvibe://hangouts/${hangout.invite_code}` });
+  };
   const handleApprovalAction = async (id: number, status: 'approved' | 'declined') => {
     try { await api(`/join-requests/${id}/${status === 'approved' ? 'approve' : 'decline'}`, { method: 'POST' }); await refreshData(); }
     catch (reason) { showAlert('Could not update request', reason instanceof Error ? reason.message : 'Try again.'); }
@@ -445,6 +473,6 @@ export default function useMobileData() {
     customAlert, showAlert, hideAlert, refreshData, handleCreateGroup, handleSendRequest, handleApprovalAction,
     handleSendChat, myHangoutsList, activeChatHangout, setActiveChatHangout, fetchMyHangouts,
     pendingAction, refreshAccount, updateProfile, uploadProfilePhoto, requestHostVerification,
-    markNotificationRead, markAllNotificationsRead, openNotifications, updateNotificationPreference, reportHangout, requestAccountDeletion,
+    markNotificationRead, markAllNotificationsRead, openNotifications, updateNotificationPreference, reportHangout, requestAccountDeletion, toggleFavorite, shareHangout,
   };
 }
