@@ -16,7 +16,7 @@ export interface Hangout {
 export interface JoinRequest { id: number; hangout_id: number; hangout_title: string; user: Profile; notes: string; status: 'pending' | 'approved' | 'declined' }
 export interface MyJoinRequest { id: number; hangout_id: number; status: 'pending' | 'waitlisted' | 'approved' | 'declined' | 'cancelled' | 'withdrawn' }
 export interface MyHangout { id: number; title: string; venue_name: string; members_names: string[]; time_summary: string }
-export interface Message { id: number; sender: string; text: string; time: string; isMe: boolean }
+export interface Message { id: number; sender: string; text: string; time: string; isMe: boolean; edited?: boolean; replyText?: string; reactions: { emoji: string; count: number; reacted: boolean }[] }
 export interface AppNotification { id: string; data: { event?: string; hangout_id?: number }; read_at: string | null; created_at: string }
 export interface NotificationPreference {
   push_enabled: boolean; email_enabled: boolean; join_updates: boolean; hangout_updates: boolean; safety_updates: boolean;

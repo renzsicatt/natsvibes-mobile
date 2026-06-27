@@ -134,6 +134,8 @@ export default function useMobileData() {
   const [activeChatHangout, setActiveChatHangout] = useState<MyHangout | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [typedMessage, setTypedMessage] = useState('');
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [trustedContact, setTrustedContactState] = useState({ name: '', phone: '' });
   const [trustedContactId, setTrustedContactId] = useState<number | null>(null);
   const [checkInActive, setCheckInActiveState] = useState(false);
@@ -206,7 +208,11 @@ export default function useMobileData() {
     setMessages(page.data.slice().reverse().map(message => ({
       id: message.id, sender: message.sender?.name ?? 'Member', text: message.message_text,
       time: new Date(message.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-      isMe: message.sender_id === currentUserId,
+      isMe: message.sender_id === currentUserId, edited: Boolean(message.edited_at), replyText: message.reply_to?.message_text,
+      reactions: Object.values((message.reactions ?? []).reduce((groups: Record<string, { emoji: string; count: number; reacted: boolean }>, reaction: any) => {
+        groups[reaction.emoji] ??= { emoji: reaction.emoji, count: 0, reacted: false };
+        groups[reaction.emoji].count += 1; groups[reaction.emoji].reacted ||= reaction.user_id === currentUserId; return groups;
+      }, {})),
     })));
   }, [currentUserId]);
 
@@ -453,9 +459,22 @@ export default function useMobileData() {
   const handleSendChat = async () => {
     if (!typedMessage.trim() || !activeChatHangout) return;
     const body = typedMessage.trim(); setTypedMessage('');
-    try { await api(`/hangouts/${activeChatHangout.id}/messages`, { method: 'POST', body: JSON.stringify({ body }) }); await fetchMessages(activeChatHangout.id); }
+    try {
+      if (editingMessageId) await api(`/messages/${editingMessageId}`, { method: 'PUT', body: JSON.stringify({ body }) });
+      else await api(`/hangouts/${activeChatHangout.id}/messages`, { method: 'POST', body: JSON.stringify({ body, reply_to_id: replyingTo?.id }) });
+      setEditingMessageId(null); setReplyingTo(null); await fetchMessages(activeChatHangout.id);
+    }
     catch (reason) { showAlert('Message failed', reason instanceof Error ? reason.message : 'Try again.'); }
   };
+  const reactToMessage = async (id: number, emoji: string) => {
+    await api(`/messages/${id}/reactions`, { method: 'POST', body: JSON.stringify({ emoji }) });
+    if (activeChatHangout) await fetchMessages(activeChatHangout.id);
+  };
+  const deleteMessage = async (id: number) => {
+    await api(`/messages/${id}`, { method: 'DELETE' });
+    if (activeChatHangout) await fetchMessages(activeChatHangout.id);
+  };
+  const editMessage = (message: Message) => { setEditingMessageId(message.id); setReplyingTo(null); setTypedMessage(message.text); };
   const setTrustedContact = async (contact: { name: string; phone: string }) => {
     setTrustedContactState(contact);
     if (!contact.name || !contact.phone) return;
@@ -479,10 +498,10 @@ export default function useMobileData() {
     showRequestModal, setShowRequestModal, joinNotes, setJoinNotes, showApprovalsPanel, setShowApprovalsPanel,
     nameInput, setNameInput, emailInput, setEmailInput, phoneInput, setPhoneInput, passwordInput, setPasswordInput,
     birthDateInput, setBirthDateInput, rememberMe, setRememberMe, currentUser, currentUserRole,
-    venues, hangouts, vibeTags, myJoinRequests, notifications, notificationPreferences, showNotifications, setShowNotifications, showReportModal, setShowReportModal, requests, messages, typedMessage, setTypedMessage, trustedContact, setTrustedContact,
+    venues, hangouts, vibeTags, myJoinRequests, notifications, notificationPreferences, showNotifications, setShowNotifications, showReportModal, setShowReportModal, requests, messages, typedMessage, setTypedMessage, replyingTo, setReplyingTo, editingMessageId, setEditingMessageId, trustedContact, setTrustedContact,
     checkInActive, setCheckInActive, isLoadingData, backendError, handleLogin, handleRegister, handleLogout,
     customAlert, showAlert, hideAlert, refreshData, handleCreateGroup, handleSendRequest, handleApprovalAction,
-    handleSendChat, myHangoutsList, activeChatHangout, setActiveChatHangout, fetchMyHangouts,
+    handleSendChat, reactToMessage, deleteMessage, editMessage, myHangoutsList, activeChatHangout, setActiveChatHangout, fetchMyHangouts,
     pendingAction, refreshAccount, updateProfile, uploadProfilePhoto, requestHostVerification,
     markNotificationRead, markAllNotificationsRead, openNotifications, updateNotificationPreference, reportHangout, requestAccountDeletion, toggleFavorite, shareHangout,
   };

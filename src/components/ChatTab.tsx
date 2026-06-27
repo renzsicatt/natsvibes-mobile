@@ -8,15 +8,7 @@ import {
   TextInput 
 } from 'react-native';
 import { Send, MessageSquare } from 'lucide-react-native';
-import { MyHangout } from '../types';
-
-interface Message {
-  id: number;
-  sender: string;
-  text: string;
-  time: string;
-  isMe: boolean;
-}
+import type { Message, MyHangout } from '../types';
 
 interface ChatTabProps {
   messages: Message[];
@@ -27,6 +19,12 @@ interface ChatTabProps {
   myHangoutsList: MyHangout[];
   onSelectHangout: (hangout: MyHangout) => void;
   onNavigateToDiscover: () => void;
+  replyingTo: Message | null;
+  editingMessageId: number | null;
+  onReply: (message: Message | null) => void;
+  onEdit: (message: Message) => void;
+  onDelete: (id: number) => void;
+  onReact: (id: number, emoji: string) => void;
 }
 
 export default function ChatTab({
@@ -37,7 +35,7 @@ export default function ChatTab({
   activeChatHangout,
   myHangoutsList,
   onSelectHangout,
-  onNavigateToDiscover
+  onNavigateToDiscover, replyingTo, editingMessageId, onReply, onEdit, onDelete, onReact
 }: ChatTabProps) {
   
   if (!activeChatHangout) {
@@ -106,11 +104,14 @@ export default function ChatTab({
         ) : (
           messages.map(msg => (
             <View key={msg.id} style={[styles.msgRow, msg.isMe ? styles.msgRowMe : styles.msgRowOther]}>
-              <View style={[styles.bubble, msg.isMe ? styles.bubbleMe : styles.bubbleOther]}>
+              <TouchableOpacity onLongPress={() => msg.isMe ? onEdit(msg) : onReply(msg)} style={[styles.bubble, msg.isMe ? styles.bubbleMe : styles.bubbleOther]}>
                 {!msg.isMe && <Text style={styles.senderName}>{msg.sender}</Text>}
+                {msg.replyText && <Text style={styles.replyPreview}>↪ {msg.replyText}</Text>}
                 <Text style={styles.msgText}>{msg.text}</Text>
-                <Text style={styles.msgTime}>{msg.time}</Text>
-              </View>
+                <Text style={styles.msgTime}>{msg.time}{msg.edited ? ' · edited' : ''}</Text>
+                <View style={styles.reactions}>{msg.reactions.map(reaction => <TouchableOpacity key={reaction.emoji} style={[styles.reaction, reaction.reacted && styles.reacted]} onPress={() => onReact(msg.id, reaction.emoji)}><Text>{reaction.emoji} {reaction.count}</Text></TouchableOpacity>)}<TouchableOpacity style={styles.reaction} onPress={() => onReact(msg.id, '❤️')}><Text>＋</Text></TouchableOpacity></View>
+                <View style={styles.messageActions}><TouchableOpacity onPress={() => onReply(msg)}><Text style={styles.actionText}>Reply</Text></TouchableOpacity>{msg.isMe && <><TouchableOpacity onPress={() => onEdit(msg)}><Text style={styles.actionText}>Edit</Text></TouchableOpacity><TouchableOpacity onPress={() => onDelete(msg.id)}><Text style={[styles.actionText, styles.deleteText]}>Delete</Text></TouchableOpacity></>}</View>
+              </TouchableOpacity>
             </View>
           ))
         )}
@@ -118,6 +119,7 @@ export default function ChatTab({
 
       {/* 4. Text Input */}
       <View style={styles.chatInputRow}>
+        {(replyingTo || editingMessageId) && <View style={styles.composerContext}><Text style={styles.composerContextText}>{editingMessageId ? 'Editing message' : `Replying to ${replyingTo?.sender}`}</Text><TouchableOpacity onPress={() => { onReply(null); setTypedMessage(''); }}><Text style={styles.contextClose}>✕</Text></TouchableOpacity></View>}
         <TextInput 
           style={styles.chatInput} 
           placeholder="Message group..." 
@@ -234,6 +236,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 4,
   },
+  replyPreview: { color: '#C4B5FD', fontSize: 11, borderLeftWidth: 2, borderLeftColor: '#8B5CF6', paddingLeft: 6, marginBottom: 5 },
+  reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 }, reaction: { backgroundColor: 'rgba(255,255,255,.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 9 }, reacted: { borderWidth: 1, borderColor: '#C4B5FD' },
+  messageActions: { flexDirection: 'row', gap: 12, marginTop: 7 }, actionText: { color: '#DDD6FE', fontSize: 10, fontWeight: '700' }, deleteText: { color: '#FCA5A5' },
   msgText: {
     color: '#FFFFFF',
     fontSize: 14,
@@ -253,7 +258,9 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(139, 92, 246, 0.15)',
     backgroundColor: '#07050E',
     gap: 12,
+    flexWrap: 'wrap',
   },
+  composerContext: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#120E22', padding: 8, borderRadius: 8 }, composerContextText: { color: '#C4B5FD', fontSize: 11 }, contextClose: { color: '#9CA3AF' },
   chatInput: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.03)',

@@ -118,6 +118,13 @@ function MainApp() {
     requestAccountDeletion,
     toggleFavorite,
     shareHangout
+    ,replyingTo,
+    setReplyingTo,
+    editingMessageId,
+    setEditingMessageId,
+    reactToMessage,
+    deleteMessage,
+    editMessage
   } = useMobileData();
   const unreadNotificationCount = notifications.filter(item => !item.read_at).length;
 
@@ -214,6 +221,12 @@ function MainApp() {
                 myHangoutsList={myHangoutsList}
                 onSelectHangout={setActiveChatHangout}
                 onNavigateToDiscover={() => setActiveTab('discover')}
+                replyingTo={replyingTo}
+                editingMessageId={editingMessageId}
+                onReply={message => { setReplyingTo(message); setEditingMessageId(null); }}
+                onEdit={editMessage}
+                onDelete={id => void deleteMessage(id)}
+                onReact={(id, emoji) => void reactToMessage(id, emoji)}
               />
             )}
 
